@@ -13,14 +13,14 @@ type City = {
 };
 
 const CITIES: City[] = [
-  { name: "Reykjavík", country: "Iceland", lat: 64.1466, lon: -21.9426, tone: "good", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Reykjavik_2017-05-03_%284%29_%28cropped%29.jpg/640px-Reykjavik_2017-05-03_%284%29_%28cropped%29.jpg" },
-  { name: "Amsterdam", country: "Netherlands", lat: 52.3676, lon: 4.9041, tone: "good", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Amsterdam_Canals_-_July_2006.jpg/640px-Amsterdam_Canals_-_July_2006.jpg" },
-  { name: "Nairobi", country: "Kenya", lat: -1.286389, lon: 36.817223, tone: "mixed", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Nairobi_CBD_Aerial_Photo.jpg/640px-Nairobi_CBD_Aerial_Photo.jpg" },
-  { name: "Lagos", country: "Nigeria", lat: 6.5244, lon: 3.3792, tone: "mixed", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Third_Mainland_Bridge_Lagos.jpg/640px-Third_Mainland_Bridge_Lagos.jpg" },
-  { name: "New York", country: "USA", lat: 40.7128, lon: -74.006, tone: "mixed", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/New_york_times_square-terabass.jpg/640px-New_york_times_square-terabass.jpg" },
-  { name: "Dubai", country: "UAE", lat: 25.2048, lon: 55.2708, tone: "caution", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Dubai_Marina_Skyline_201706.jpg/640px-Dubai_Marina_Skyline_201706.jpg" },
-  { name: "Delhi", country: "India", lat: 28.7041, lon: 77.1025, tone: "caution", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Connaught_Place%2C_New_Delhi.jpg/640px-Connaught_Place%2C_New_Delhi.jpg" },
-  { name: "São Paulo", country: "Brazil", lat: -23.5505, lon: -46.6333, tone: "mixed", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Avenida_Paulista_2017.jpg/640px-Avenida_Paulista_2017.jpg" },
+  { name: "Reykjavík", country: "Iceland", lat: 64.1466, lon: -21.9426, tone: "good", img: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=75&auto=format" },
+  { name: "Amsterdam", country: "Netherlands", lat: 52.3676, lon: 4.9041, tone: "good", img: "https://images.unsplash.com/photo-1534351590666-13e3e96b5017?q=80&w=870&auto=format" },
+  { name: "Nairobi", country: "Kenya", lat: -1.286389, lon: 36.817223, tone: "mixed", img: "https://images.unsplash.com/photo-1596005554384-d293674c91d7?q=80&w=898&auto=format" },
+  { name: "Lagos", country: "Nigeria", lat: 6.5244, lon: 3.3792, tone: "mixed", img: "https://images.unsplash.com/photo-1618828665011-0abd973f7bb8?q=80&w=1032&auto=format" },
+  { name: "New York", country: "USA", lat: 40.7128, lon: -74.006, tone: "mixed", img: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=75&auto=format" },
+  { name: "Dubai", country: "UAE", lat: 25.2048, lon: 55.2708, tone: "caution", img: "https://images.unsplash.com/photo-1504270997636-07ddfbd48945?w=800&q=75&auto=format" },
+  { name: "Delhi", country: "India", lat: 28.7041, lon: 77.1025, tone: "caution", img: "https://images.unsplash.com/photo-1587474260584-136574528ed5?q=80&w=870&auto=format" },
+  { name: "São Paulo", country: "Brazil", lat: -23.5505, lon: -46.6333, tone: "mixed", img: "https://images.unsplash.com/photo-1572894234976-d961418c709d?q=80&w=435&auto=format" },
 ];
 
 function toneStyles(tone?: City["tone"]) {

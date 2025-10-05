@@ -8,10 +8,14 @@ type ScoreResult = {
   input: { lat: number; lon: number };
   metrics: {
     heatIndexF?: number;
+    currentHeatIndexF?: number;
+    currentHeatIndexSource?: 'open-meteo' | 'power-hourly' | 'power-daily';
+    maxHeatIndex24hF?: number;
     recentHotDays?: number;
     populationDensity?: number;
     nearbyHazards?: { count: number; nearestKm?: number; categories: Record<string, number> };
     airQualityProxy?: number;
+    airNow?: { pm25?: number; aqiUS?: number; observedAt?: string };
     healthBadge?: string;
     floodBadge?: string;
   };
@@ -163,11 +167,13 @@ function ResultInner() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              <Metric label="Heat index (yesterday)" value={metrics.heatIndexF !== undefined ? `${Math.round(metrics.heatIndexF)} °F` : undefined} hint="How hot it feels combining temperature and humidity." />
+              <Metric label="Current Heat Index" value={metrics.currentHeatIndexF !== undefined ? `${Math.round(metrics.currentHeatIndexF)} °F` : (metrics.heatIndexF !== undefined ? `${Math.round(metrics.heatIndexF)} °F` : undefined)} hint={`Realtime 'feels like' heat using temperature and humidity${metrics.currentHeatIndexSource ? ` (source: ${metrics.currentHeatIndexSource})` : ''}.`} />
+              <Metric label="Max Heat Index (24h)" value={metrics.maxHeatIndex24hF !== undefined ? `${Math.round(metrics.maxHeatIndex24hF)} °F` : undefined} hint="Highest heat index observed over the last 24 hours (UTC)." />
               <Metric label="Recent hot days (7d)" value={metrics.recentHotDays} hint="Number of days with dangerous heat index in the last week." />
               <Metric label="Population density" value={metrics.populationDensity !== undefined ? `${Math.round(metrics.populationDensity)} ppl/km²` : undefined} hint="People per square kilometer (SEDAC GPW)." />
               <Metric label="Nearby hazards (100 km)" value={metrics.nearbyHazards?.count ?? 0} hint="Open events from NASA EONET within 100 km." />
               <Metric label="Air quality proxy" value={metrics.airQualityProxy !== undefined ? metrics.airQualityProxy : undefined} hint="Derived from nearby smoke/dust/volcanic signals." />
+              <Metric label="Air quality (PM2.5/AQI)" value={metrics.airNow?.aqiUS !== undefined ? `AQI ${metrics.airNow.aqiUS}${metrics.airNow.pm25 !== undefined ? ` • ${metrics.airNow.pm25} µg/m³` : ''}` : undefined} hint="Nearest OpenAQ observation (latest)." />
             </div>
           )}
           {metrics.nearbyHazards?.categories && (
@@ -240,7 +246,9 @@ function ResultInner() {
                     });
                     const j = await res.json();
                     if (!res.ok) {
-                      setQa({ q: qa.q, a: '', error: j?.error || 'AI error', loading: false });
+                      const detail = typeof j?.detail === 'string' ? j.detail : '';
+                      const errMsg = [j?.error || 'AI error', detail].filter(Boolean).join(': ');
+                      setQa({ q: qa.q, a: '', error: errMsg.slice(0, 800), loading: false });
                     } else {
                       setQa({ q: qa.q, a: j?.answer ?? 'No answer', loading: false });
                     }
