@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import SearchBox from "../components/SearchBox";
 
 const MapClient = dynamic(() => import("../components/MapClient"), { ssr: false });
@@ -31,9 +32,10 @@ type ScoreResult = {
 export default function Home() {
   const [lat, setLat] = useState<number | ''>('');
   const [lon, setLon] = useState<number | ''>('');
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScoreResult | null>(null);
   const [picked, setPicked] = useState<{ lat: number; lon: number } | null>(null);
+  const [routing, setRouting] = useState(false);
+  const router = useRouter();
   const [showTrueColor, setShowTrueColor] = useState(true);
   const [showNdvi, setShowNdvi] = useState(true);
   const [base, setBase] = useState<'osm' | 'satellite' | 'humanitarian' | 'streets'>('osm');
@@ -61,18 +63,8 @@ export default function Home() {
 
   async function score() {
     if (!canScore) return;
-    setLoading(true);
-    setResult(null);
-    try {
-      const r = await fetch(`/api/score?lat=${lat}&lon=${lon}`).then((r) => r.json());
-      setResult(r);
-      setPicked({ lat: Number(lat), lon: Number(lon) });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to score location";
-      alert(msg);
-    } finally {
-      setLoading(false);
-    }
+    setRouting(true);
+    router.push(`/result?lat=${lat}&lon=${lon}`);
   }
 
   const metrics = result?.metrics ?? {};
@@ -125,10 +117,10 @@ export default function Home() {
               </button>
               <button
                 onClick={score}
-                disabled={!canScore || loading}
+                disabled={!canScore || routing}
                 className="px-3 py-2 rounded bg-emerald-600 disabled:bg-neutral-700 hover:bg-emerald-500 text-sm font-medium"
               >
-                {loading ? "Scoring…" : "Score this location"}
+                {routing ? "Loading results…" : "Score this location"}
               </button>
             </div>
           </div>
