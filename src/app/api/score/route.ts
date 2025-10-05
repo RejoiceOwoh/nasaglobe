@@ -95,6 +95,31 @@ export async function GET(req: NextRequest) {
     const eonet = (eonetJson || null) as EonetResponse | null;
     const sedac = (sedacJson || null) as SedacFeatureCollection | null;
 
+    // Reverse geocoding (settlement type) for universal coverage
+    async function reverseGeocode(lat: number, lon: number): Promise<{ name?: string; class?: string; type?: string } | null> {
+      try {
+        const url = new URL('https://nominatim.openstreetmap.org/reverse');
+        url.searchParams.set('format', 'jsonv2');
+        url.searchParams.set('lat', String(lat));
+        url.searchParams.set('lon', String(lon));
+        url.searchParams.set('zoom', '10');
+        url.searchParams.set('addressdetails', '0');
+        const res = await fetch(url.toString(), {
+          headers: {
+            'User-Agent': 'nasaglobe/1.0 (NASA Space Apps demo)',
+            'Accept': 'application/json'
+          },
+          cache: 'no-store'
+        });
+        if (!res.ok) return null;
+        const j = await res.json();
+        return { name: j?.name || j?.display_name, class: j?.class, type: j?.type };
+      } catch {
+        return null;
+      }
+    }
+    const settlement = await reverseGeocode(lat, lon);
+
     // POWER parse
   const days = power?.properties?.parameter?.T2M_MAX ? Object.keys(power.properties.parameter.T2M_MAX) : [];
     const lastKey = days[days.length - 1];
@@ -194,6 +219,11 @@ export async function GET(req: NextRequest) {
 
     // AI-style narrative (rule-based summarizer)
   const narrative: string[] = [];
+    if (settlement?.type) {
+      const t = settlement.type;
+      if (['city', 'town'].includes(t)) narrative.push('This location appears urban with access to services and higher activity.');
+      else if (['village', 'hamlet', 'isolated_dwelling'].includes(t)) narrative.push('This location appears rural—expect quieter surroundings and longer travel times to services.');
+    }
     if (heatIndexFVal !== undefined) {
       if (heatIndexFVal >= 105) narrative.push("Severe heat burden detected. Expect hazardous mid-day conditions; prioritize indoor cooling and hydration.");
       else if (heatIndexFVal >= 95) narrative.push("Elevated heat conditions likely; plan outdoor activities for mornings/evenings.");
@@ -226,6 +256,7 @@ export async function GET(req: NextRequest) {
         populationDensity: popDensity,
         nearbyHazards: { count: hazardCount, nearestKm, categories },
         airQualityProxy,
+        settlement,
       },
       score,
       advice: (advice.length ? advice : ["No major concerns detected from recent Earth observation indicators."]).concat(narrative)

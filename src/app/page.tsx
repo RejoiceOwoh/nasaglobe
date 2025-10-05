@@ -7,32 +7,12 @@ import SearchBox from "../components/SearchBox";
 
 const MapClient = dynamic(() => import("../components/MapClient"), { ssr: false });
 
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded border border-neutral-800 bg-neutral-900 p-3">
-      <div className="text-xs text-neutral-400">{label}</div>
-      <div className="text-sm mt-1">{String(value)}</div>
-    </div>
-  );
-}
+// (results moved to /result)
 
-type ScoreResult = {
-  input: { lat: number; lon: number };
-  metrics: {
-    heatIndexF?: number;
-    recentHotDays?: number;
-    populationDensity?: number;
-    nearbyHazards?: { count: number; nearestKm?: number; categories: Record<string, number> };
-    airQualityProxy?: number;
-  };
-  score: number;
-  advice: string[];
-};
 
 export default function Home() {
   const [lat, setLat] = useState<number | ''>('');
   const [lon, setLon] = useState<number | ''>('');
-  const [result, setResult] = useState<ScoreResult | null>(null);
   const [picked, setPicked] = useState<{ lat: number; lon: number } | null>(null);
   const [routing, setRouting] = useState(false);
   const router = useRouter();
@@ -48,7 +28,6 @@ export default function Home() {
   }
 
   async function useMyLocation() {
-    setResult(null);
     if (!navigator.geolocation) return alert("Geolocation not supported");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -67,14 +46,7 @@ export default function Home() {
     router.push(`/result?lat=${lat}&lon=${lon}`);
   }
 
-  const metrics = result?.metrics ?? {};
-
-  function scoreColor(s: number) {
-    if (s >= 80) return "text-emerald-400";
-    if (s >= 60) return "text-yellow-300";
-    if (s >= 40) return "text-orange-400";
-    return "text-red-400";
-  }
+  // results are displayed on /result page now
 
   return (
     <div className="min-h-screen p-6 sm:p-10 grid gap-6 bg-neutral-950 text-neutral-100">
@@ -83,7 +55,7 @@ export default function Home() {
         <div className="text-xs text-neutral-400">POWER • EONET • SEDAC • GIBS</div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <div className="rounded-lg border border-neutral-800 p-4 bg-neutral-900/60">
           <div className="flex flex-col gap-3">
             <SearchBox
@@ -162,49 +134,21 @@ export default function Home() {
             Pick on map, paste coordinates, or use your device location. Zoom and click to set point.
           </p>
         </div>
-
-        <div className="rounded-lg border border-neutral-800 p-4 bg-neutral-900/60">
-          <h2 className="font-semibold mb-2">Results</h2>
-          {!result && <div className="text-neutral-400 text-sm">Run a score to see health and livability insights.</div>}
-          {result && Array.isArray(result.advice) && (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <Metric label="Heat index (yesterday)" value={metrics.heatIndexF !== undefined ? `${Math.round(metrics.heatIndexF)} °F` : '—'} />
-                <Metric label="Recent hot days (7d est.)" value={metrics.recentHotDays ?? '—'} />
-                <Metric label="Population density (SEDAC)" value={metrics.populationDensity !== undefined ? `${Math.round(metrics.populationDensity)} ppl/km²` : '—'} />
-                <Metric label="Nearby hazards (EONET, 100 km)" value={metrics.nearbyHazards?.count ?? 0} />
-                <Metric label="Air quality proxy" value={metrics.airQualityProxy !== undefined ? `${metrics.airQualityProxy}` : '—'} />
-              </div>
-              {metrics.nearbyHazards?.categories && (
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {Object.entries(metrics.nearbyHazards.categories).map(([k, v]) => (
-                    <span key={k} className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700">
-                      <b className="text-xs">{k}</b>
-                      <span className="text-xs text-neutral-400">{v}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div>
-                <div className="text-neutral-300 font-medium mt-2">Advice</div>
-                <ul className="list-disc ml-5 mt-1 space-y-1">
-                  {(result.advice || []).map((a, i) => (<li key={i}>{a}</li>))}
-                </ul>
-              </div>
-              <div className="text-xl font-semibold flex items-center gap-2">
-                Liveability score:
-                <span className={`inline-flex items-center justify-center w-12 h-12 rounded-full border border-neutral-700 bg-neutral-800 ${scoreColor(result.score)}`}>
-                  {Math.round(result.score)}
-                </span>
-                /100
-              </div>
-              <div className="text-xs text-neutral-500">
-                Data sources: NASA POWER (heat), EONET (hazards), SEDAC GPW (pop). NDVI and imagery shown on map via NASA GIBS.
-              </div>
-            </div>
-          )}
-        </div>
       </div>
+
+      <section className="rounded-lg border border-neutral-800 p-4 bg-neutral-900/60">
+        <h2 className="font-semibold mb-2">Discover cities</h2>
+        <div className="text-sm text-neutral-400">Curated places to explore. Click any to score it instantly.</div>
+        {/* TODO: populate with a mixed list and images; clicking routes to /result?lat=&lon= */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-3 opacity-80">
+          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
+          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
+          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
+          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
+          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
+          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
+        </div>
+      </section>
     </div>
   );
 }
