@@ -71,7 +71,7 @@ function ResultInner() {
   const metrics = data?.metrics ?? {};
   const advice = Array.isArray(data?.advice) ? data!.advice : [];
   const adviceSource = data?.adviceSource;
-  const [qa, setQa] = useState<{ q: string; a: string; loading?: boolean } | null>(null);
+  const [qa, setQa] = useState<{ q: string; a: string; loading?: boolean; error?: string } | null>(null);
 
   function scoreColor(s: number) {
     if (s >= 80) return "text-emerald-400";
@@ -239,14 +239,21 @@ function ResultInner() {
                       body: JSON.stringify({ question: qa.q, lat, lon, context: metrics })
                     });
                     const j = await res.json();
-                    setQa({ q: qa.q, a: j?.answer ?? 'No answer', loading: false });
+                    if (!res.ok) {
+                      setQa({ q: qa.q, a: '', error: j?.error || 'AI error', loading: false });
+                    } else {
+                      setQa({ q: qa.q, a: j?.answer ?? 'No answer', loading: false });
+                    }
                   } catch {
-                    setQa({ q: qa.q, a: 'Error contacting AI service.', loading: false });
+                    setQa({ q: qa.q, a: '', error: 'Error contacting AI service.', loading: false });
                   }
                 }}
                 className="px-3 py-2 rounded bg-emerald-600 disabled:bg-neutral-700 hover:bg-emerald-500 text-sm font-medium"
               >Ask</button>
             </div>
+            {qa?.error && (
+              <div className="mt-3 text-sm text-red-400">{qa.error}</div>
+            )}
             {qa?.a && (
               <div className="mt-3 text-sm text-neutral-200 whitespace-pre-wrap">{qa.a}</div>
             )}

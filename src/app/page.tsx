@@ -52,7 +52,7 @@ export default function Home() {
   return (
     <div className="min-h-screen p-6 sm:p-10 grid gap-6 bg-neutral-950 text-neutral-100">
       <header className="flex items-center justify-between">
-        <h1 className="text-lg sm:text-2xl font-semibold">NASA Liveability Advisor</h1>
+  <h1 className="text-lg sm:text-2xl font-semibold">Eco-Safe — NASA Liveability Advisor</h1>
         <div className="text-xs text-neutral-400">POWER • EONET • SEDAC • GIBS</div>
       </header>
 
