@@ -17,10 +17,12 @@ export default function MapClient({
   picked,
   onPick,
   overlays,
+  base = 'osm',
 }: {
   picked: { lat: number; lon: number } | null;
   onPick: (pt: { lat: number; lon: number }) => void;
   overlays?: { trueColor?: boolean; ndvi?: boolean };
+  base?: 'osm' | 'streets' | 'satellite' | 'humanitarian';
 }) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const gibsTrueColor = useMemo(
@@ -53,7 +55,18 @@ export default function MapClient({
       scrollWheelZoom
     >
       <ClickPicker />
-      <TileLayer attribution="© OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      {base === 'osm' && (
+        <TileLayer attribution="© OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      )}
+      {base === 'streets' && (
+        <TileLayer attribution="© CARTO" url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+      )}
+      {base === 'humanitarian' && (
+        <TileLayer attribution="© Humanitarian OpenStreetMap Team" url="https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png" />
+      )}
+      {base === 'satellite' && (
+        <TileLayer attribution="Tiles © Esri" url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+      )}
       {overlays?.trueColor !== false && (
         <TileLayer attribution="Imagery © NASA GIBS" url={gibsTrueColor} opacity={0.85} />
       )}

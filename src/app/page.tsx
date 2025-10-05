@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import SearchBox from "../components/SearchBox";
 
 const MapClient = dynamic(() => import("../components/MapClient"), { ssr: false });
 
@@ -35,6 +36,7 @@ export default function Home() {
   const [picked, setPicked] = useState<{ lat: number; lon: number } | null>(null);
   const [showTrueColor, setShowTrueColor] = useState(true);
   const [showNdvi, setShowNdvi] = useState(true);
+  const [base, setBase] = useState<'osm' | 'satellite' | 'humanitarian' | 'streets'>('osm');
 
   const canScore = useMemo(() => typeof lat === 'number' && typeof lon === 'number' && !Number.isNaN(lat) && !Number.isNaN(lon), [lat, lon]);
 
@@ -92,6 +94,14 @@ export default function Home() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="rounded-lg border border-neutral-800 p-4 bg-neutral-900/60">
           <div className="flex flex-col gap-3">
+            <SearchBox
+              placeholder="Search city or address"
+              onSelect={(s) => {
+                setLat(Number(s.lat.toFixed(5)));
+                setLon(Number(s.lon.toFixed(5)));
+                setPicked({ lat: s.lat, lon: s.lon });
+              }}
+            />
             <div className="flex gap-3">
               <input
                 placeholder="Latitude"
@@ -123,7 +133,20 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-neutral-300 mt-3">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-300 mt-3">
+            <div className="inline-flex items-center gap-2">
+              Base:
+              <select
+                value={base}
+                onChange={(e) => setBase(e.target.value as 'osm' | 'streets' | 'satellite' | 'humanitarian')}
+                className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-xs"
+              >
+                <option value="osm">OpenStreetMap</option>
+                <option value="streets">Streets (Carto)</option>
+                <option value="satellite">Satellite (Esri)</option>
+                <option value="humanitarian">Humanitarian</option>
+              </select>
+            </div>
             <label className="inline-flex items-center gap-2">
               <input type="checkbox" checked={showTrueColor} onChange={() => setShowTrueColor(v=>!v)} /> True Color
             </label>
@@ -140,6 +163,7 @@ export default function Home() {
                 setPicked(pt);
               }}
               overlays={{ trueColor: showTrueColor, ndvi: showNdvi }}
+              base={base}
             />
           </div>
           <p className="text-xs text-neutral-400 mt-2">
@@ -150,7 +174,7 @@ export default function Home() {
         <div className="rounded-lg border border-neutral-800 p-4 bg-neutral-900/60">
           <h2 className="font-semibold mb-2">Results</h2>
           {!result && <div className="text-neutral-400 text-sm">Run a score to see health and livability insights.</div>}
-          {result && (
+          {result && Array.isArray(result.advice) && (
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
                 <Metric label="Heat index (yesterday)" value={metrics.heatIndexF !== undefined ? `${Math.round(metrics.heatIndexF)} °F` : '—'} />
@@ -172,7 +196,7 @@ export default function Home() {
               <div>
                 <div className="text-neutral-300 font-medium mt-2">Advice</div>
                 <ul className="list-disc ml-5 mt-1 space-y-1">
-                  {result.advice.map((a, i) => (<li key={i}>{a}</li>))}
+                  {(result.advice || []).map((a, i) => (<li key={i}>{a}</li>))}
                 </ul>
               </div>
               <div className="text-xl font-semibold flex items-center gap-2">
