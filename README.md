@@ -30,11 +30,12 @@ Push this repo and import it into Vercel. Default settings work:
 - `src/app/globals.css` — Tailwind + Leaflet CSS imports
 
 ### Docs
-See `TECHNICAL_DOCS.md` for data sources, methods, and architecture.
+See `TECHNICAL_DOCS.md` for an in-depth tour of all data sources (NASA POWER daily + hourly, EONET hazards, SEDAC density, GIBS overlays, plus Open‑Meteo, OpenAQ, Nominatim), how we use them, and what they enable in the product.
 
 ### Notes
-- POWER data is typically delayed by ~1 day; Heat Index is based on the most recent day available.
-- Air quality proxy is derived from EONET wildfire/dust/volcano signals.
+- POWER daily can lag by ~1 day; we add POWER hourly and Open‑Meteo current for near-time heat signals (Current HI and 24h max).
+- Air quality proxy comes from EONET wildfire/dust/volcano signals; OpenAQ adds real-time PM2.5→US AQI when available.
+- Overlays include True Color, NDVI, LST, AOD, Night Lights, and Water to visualize context.
 
 ### Optional: Richer LLM Narrative
 If you want AI-generated concise guidance on the results page, set an OpenAI API key. Without it, the app uses the built-in rule-based narrative.

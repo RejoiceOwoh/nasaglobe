@@ -36,7 +36,7 @@ export default function SharePage() {
         <p className="text-sm text-neutral-400 mt-1">Help others with firsthand insights about heat, air, flooding, and safe living. Your submission goes directly to our inbox.</p>
 
         <form
-          action="https://formsubmit.co/rejoicecorporations@gmail.com"
+          action="#"
           method="post"
           encType="multipart/form-data"
           className="mt-6 grid gap-4"
@@ -45,23 +45,42 @@ export default function SharePage() {
             setErrorMsg(null);
             setSubmitting(true);
             try {
+              if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+                throw new Error('You appear to be offline. Please check your internet connection and try again.');
+              }
               const formEl = e.currentTarget as HTMLFormElement;
               const fd = new FormData(formEl);
-              const res = await fetch('https://formsubmit.co/ajax/rejoicecorporations@gmail.com', {
+              // Submit to our server-side proxy for better reliability
+              const res = await fetch('/api/share', {
                 method: 'POST',
                 body: fd,
                 headers: { 'Accept': 'application/json' },
               });
               if (!res.ok) {
-                const txt = await res.text();
-                setErrorMsg(txt || 'Submission failed');
+                let detail = '';
+                try {
+                  const j = await res.json();
+                  detail = j?.error || '';
+                } catch {
+                  const t = await res.text();
+                  detail = t;
+                }
+                const msg = res.status === 413
+                  ? 'Attachments exceed the allowed size (5MB total). Please compress or remove some files.'
+                  : res.status === 400
+                    ? (detail || 'Missing some required fields.')
+                    : res.status === 504
+                      ? 'Network timeout while sending your submission. Please retry in a moment.'
+                      : `Submission failed (${res.status}). ${detail || ''}`;
+                setErrorMsg(msg);
                 setSubmitting(false);
                 return;
               }
               // success → redirect
               window.location.href = '/thanks';
-            } catch {
-              setErrorMsg('Network error while submitting.');
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : 'Network error while submitting.';
+              setErrorMsg(msg);
               setSubmitting(false);
             }
           }}
@@ -82,7 +101,7 @@ export default function SharePage() {
             <div>
               <label className="block text-xs text-neutral-400 mb-1">Email (for reply)</label>
               <input name="email" type="email" required className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="you@example.com" />
-              <input type="hidden" name="_replyto" value="{{email}}" />
+              {/* _replyto will be set server-side for reliability */}
             </div>
           </div>
 
@@ -166,6 +185,9 @@ export default function SharePage() {
             <span className="text-xs text-neutral-500">Powered by formsubmit.co</span>
           </div>
           {errorMsg && <div className="text-sm text-red-400">{errorMsg}</div>}
+          {!errorMsg && submitting && (
+            <div className="text-sm text-neutral-400">Sending… If this takes more than ~10s, please retry. Large attachments or network issues can slow things down.</div>
+          )}
         </form>
       </div>
     </div>
