@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import SearchBox from "../components/SearchBox";
+import FeaturedCities from "../components/FeaturedCities";
 
 const MapClient = dynamic(() => import("../components/MapClient"), { ssr: false });
 
@@ -139,15 +140,7 @@ export default function Home() {
       <section className="rounded-lg border border-neutral-800 p-4 bg-neutral-900/60">
         <h2 className="font-semibold mb-2">Discover cities</h2>
         <div className="text-sm text-neutral-400">Curated places to explore. Click any to score it instantly.</div>
-        {/* TODO: populate with a mixed list and images; clicking routes to /result?lat=&lon= */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-3 opacity-80">
-          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
-          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
-          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
-          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
-          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
-          <div className="h-24 rounded bg-neutral-800 animate-pulse" />
-        </div>
+        <FeaturedCities />
       </section>
     </div>
   );

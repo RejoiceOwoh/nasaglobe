@@ -146,6 +146,7 @@ export async function GET(req: NextRequest) {
     let nearestKm: number | undefined;
     const categories: Record<string, number> = {};
   let aqPenalty = 0; // accumulate penalties for air quality proxy
+    let recentFlood = false;
     for (const ev of events) {
       const g = ev.geometry?.[ev.geometry.length - 1];
       if (!g || g.type !== 'Point') continue;
@@ -156,6 +157,7 @@ export async function GET(req: NextRequest) {
         nearestKm = nearestKm === undefined ? d : Math.min(nearestKm, d);
         const cat = ev.categories?.[0]?.title ?? 'Other';
         categories[cat] = (categories[cat] || 0) + 1;
+        if (cat === 'Floods') recentFlood = true;
       }
       // Air quality proxy penalties for smoke/dust emitting hazards
       const catTitle = ev.categories?.[0]?.title ?? '';
@@ -181,7 +183,7 @@ export async function GET(req: NextRequest) {
       // ignore
     }
 
-    // scoring
+  // scoring
     // components: heat burden (0-40), hazards proximity (0-30), population pressure (0-20), baseline (10)
   let score = 10;
   const advice: string[] = [];
@@ -217,7 +219,18 @@ export async function GET(req: NextRequest) {
 
     score = Math.max(0, Math.min(100, Math.round(score)));
 
-    // AI-style narrative (rule-based summarizer)
+    // Badges
+    let healthBadge: string | undefined;
+    if (heatIndexFVal !== undefined) {
+      if (heatIndexFVal >= 115) healthBadge = 'Extreme heat risk';
+      else if (heatIndexFVal >= 105) healthBadge = 'Very high heat risk';
+      else if (heatIndexFVal >= 95) healthBadge = 'High heat risk';
+      else if (heatIndexFVal >= 85) healthBadge = 'Moderate heat risk';
+      else healthBadge = 'Low heat risk';
+    }
+    const floodBadge = recentFlood ? 'Recent flood nearby' : undefined;
+
+  // AI-style narrative (rule-based summarizer, optionally enhanced by OpenAI if key provided)
   const narrative: string[] = [];
     if (settlement?.type) {
       const t = settlement.type;
@@ -248,6 +261,44 @@ export async function GET(req: NextRequest) {
     }
     if (notes.length) narrative.push(...notes.map(n => `Note: ${n}`));
 
+    // Optional LLM enhancement
+    let llmAdvice: string[] | null = null;
+    try {
+      const key = process.env.OPENAI_API_KEY;
+      if (key) {
+        const sys = 'You are a concise housing liveability advisor using NASA Earth data. Write 3-6 bullet points: actionable, neutral tone, avoid absolutes. Include specific references to heat, hazards, density, and air quality proxy. Keep each bullet under 25 words.';
+        const user = JSON.stringify({ lat, lon, score, metrics: { heatIndexF: heatIndexFVal, recentHotDays, hazardCount, nearestKm, categories, populationDensity: popDensity, airQualityProxy } });
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: sys },
+              { role: 'user', content: `Create bullet guidance for this location data: ${user}` }
+            ],
+            temperature: 0.4,
+            max_tokens: 200
+          })
+        });
+        if (res.ok) {
+          type ChatResponse = { choices?: Array<{ message?: { content?: string } }> };
+          const j: ChatResponse = await res.json();
+          const content: string = j?.choices?.[0]?.message?.content || '';
+          if (content) {
+            // Split into bullets by line
+            llmAdvice = content
+              .split(/\n|\r/)
+              .map((s: string) => s.replace(/^[-*\s]+/, '').trim())
+              .filter((s: string) => s.length > 0)
+              .slice(0, 6);
+          }
+        }
+      }
+    } catch {
+      // ignore LLM errors; fallback to rule-based narrative only
+    }
+
     const payload = {
       input: { lat, lon },
       metrics: {
@@ -257,9 +308,12 @@ export async function GET(req: NextRequest) {
         nearbyHazards: { count: hazardCount, nearestKm, categories },
         airQualityProxy,
         settlement,
+        healthBadge,
+        floodBadge,
       },
       score,
-      advice: (advice.length ? advice : ["No major concerns detected from recent Earth observation indicators."]).concat(narrative)
+      advice: (llmAdvice && llmAdvice.length ? llmAdvice : (advice.length ? advice : ["No major concerns detected from recent Earth observation indicators."]))
+        .concat(narrative)
     };
 
     return NextResponse.json(payload, { headers: { 'Cache-Control': 's-maxage=600, stale-while-revalidate=600' } });

@@ -12,6 +12,8 @@ type ScoreResult = {
     populationDensity?: number;
     nearbyHazards?: { count: number; nearestKm?: number; categories: Record<string, number> };
     airQualityProxy?: number;
+    healthBadge?: string;
+    floodBadge?: string;
   };
   score: number;
   advice: string[];
@@ -97,6 +99,20 @@ export default function ResultPage() {
               Overall livability score based on recent heat, hazards, population pressure, and air quality proxy.
             </div>
           </div>
+          {(metrics.healthBadge || metrics.floodBadge) && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {metrics.healthBadge && (
+                <span className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700 text-xs" title="Derived from Heat Index risk category.">
+                  Health: {metrics.healthBadge}
+                </span>
+              )}
+              {metrics.floodBadge && (
+                <span className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700 text-xs" title="Recent flood signals from nearby EONET events.">
+                  Flood: {metrics.floodBadge}
+                </span>
+              )}
+            </div>
+          )}
         </Card>
 
         <Card>
@@ -127,6 +143,20 @@ export default function ResultPage() {
           </ul>
           <div className="text-xs text-neutral-500 mt-3">Sources: NASA POWER (heat), EONET (hazards), SEDAC GPW (population). Imagery and greenness via NASA GIBS.</div>
         </Card>
+
+        {valid && (
+          <Card>
+            <div className="text-neutral-300 font-medium mb-3">Nearby alternatives</div>
+            <div className="text-xs text-neutral-400">Quickly try nearby points to compare conditions.</div>
+            <ul className="mt-2 grid grid-cols-2 gap-2 text-sm">
+              {[{ dLat: 0.2, dLon: 0, label: "North ~22km" }, { dLat: -0.2, dLon: 0, label: "South ~22km" }, { dLat: 0, dLon: 0.2, label: "East ~22km" }, { dLat: 0, dLon: -0.2, label: "West ~22km" }, { dLat: 0.15, dLon: 0.15, label: "NE ~30km" }, { dLat: -0.15, dLon: -0.15, label: "SW ~30km" }].map((o) => (
+                <li key={o.label}>
+                  <Link className="underline text-sky-400" href={`/result?lat=${(lat + o.dLat).toFixed(5)}&lon=${(lon + o.dLon).toFixed(5)}`}>{o.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
       </div>
     </div>
   );
