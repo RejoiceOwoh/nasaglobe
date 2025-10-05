@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
   type PowerHourlyResponse = { properties?: { parameter?: { T2M?: Record<string, number>; RH2M?: Record<string, number> } } };
     type EonetResponse = { events?: Array<{ categories?: Array<{ title?: string }>; geometry?: Array<{ type: string; coordinates: [number, number] }> }> };
     type SedacFeatureCollection = { features?: Array<{ properties?: Record<string, number> }> };
-    type OpenMeteoCurrent = { temperature_2m?: number; relative_humidity_2m?: number; apparent_temperature?: number; wind_speed_10m?: number; time?: string };
+  type OpenMeteoCurrent = { temperature_2m?: number; relative_humidity_2m?: number; apparent_temperature?: number; wind_speed_10m?: number; wind_gusts_10m?: number; precipitation?: number; cloud_cover?: number; uv_index?: number; time?: string };
     type OpenMeteoResponse = { current?: OpenMeteoCurrent };
     type OpenAQMeasurement = { parameter?: string; value?: number; unit?: string; lastUpdated?: string };
     type OpenAQResult = { measurements?: OpenAQMeasurement[]; date?: { utc?: string } };
@@ -190,7 +190,7 @@ export async function GET(req: NextRequest) {
     // Open-Meteo current weather as realtime fallback/augment
     let omCurrent: OpenMeteoCurrent | undefined;
     try {
-      const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m&timezone=UTC`;
+      const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,wind_gusts_10m,precipitation,cloud_cover,uv_index&timezone=UTC`;
       const omJson = await fetchJson(omUrl, 8000) as unknown as OpenMeteoResponse | null;
       const cur = omJson?.current ?? null;
       if (cur && typeof cur === 'object') {
@@ -199,6 +199,10 @@ export async function GET(req: NextRequest) {
           relative_humidity_2m: typeof cur.relative_humidity_2m === 'number' ? cur.relative_humidity_2m : undefined,
           apparent_temperature: typeof cur.apparent_temperature === 'number' ? cur.apparent_temperature : undefined,
           wind_speed_10m: typeof cur.wind_speed_10m === 'number' ? cur.wind_speed_10m : undefined,
+          wind_gusts_10m: typeof (cur as OpenMeteoCurrent).wind_gusts_10m === 'number' ? (cur as OpenMeteoCurrent).wind_gusts_10m : undefined,
+          precipitation: typeof (cur as OpenMeteoCurrent).precipitation === 'number' ? (cur as OpenMeteoCurrent).precipitation : undefined,
+          cloud_cover: typeof (cur as OpenMeteoCurrent).cloud_cover === 'number' ? (cur as OpenMeteoCurrent).cloud_cover : undefined,
+          uv_index: typeof (cur as OpenMeteoCurrent).uv_index === 'number' ? (cur as OpenMeteoCurrent).uv_index : undefined,
           time: typeof cur.time === 'string' ? cur.time : undefined,
         };
       }
@@ -438,6 +442,7 @@ export async function GET(req: NextRequest) {
         nearbyHazards: { count: hazardCount, nearestKm, categories },
     airQualityProxy,
     airNow,
+        now: omCurrent,
         settlement,
         healthBadge,
         floodBadge,

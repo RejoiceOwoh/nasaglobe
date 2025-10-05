@@ -8,43 +8,58 @@ export async function POST(req: NextRequest) {
     if (!key) {
       return NextResponse.json({ error: 'OPENAI_API_KEY not set' }, { status: 400 });
     }
-    const body = await req.json().catch(() => ({}));
-    const { question, lat, lon, context } = body || {};
+  const body = await req.json().catch(() => ({}));
+  const { question, lat, lon, context, history, purpose }: { question?: string; lat?: number; lon?: number; context?: unknown; history?: Array<{ role: 'user'|'assistant'|'system'; content: string }>; purpose?: 'qa' | 'explain' } = body || {};
     if (!question || typeof question !== 'string') {
       return NextResponse.json({ error: 'Missing question' }, { status: 400 });
     }
 
-    const sys = `You are an assistant that answers questions about a location using NASA Earth observation context. Be concise, factual, and practical. Prefer referencing: heat, recent hazards (EONET), air quality proxy (from smoke/dust/volcano proximity), and population density. Where needed, explain limits. Avoid making up specifics beyond provided context.`;
-    const user = `Question: ${question}\nLat: ${lat}\nLon: ${lon}\nContext: ${JSON.stringify(context || {}, null, 2)}`;
+    const sysQa = `You are an assistant that answers questions about a location using NASA Earth observation context. Be concise, factual, and practical. Prefer referencing: heat (POWER/Open-Meteo), recent hazards (EONET), air quality (OpenAQ/proxy), population, and any provided now metrics. Be clear about data limits.`;
+    const sysExplain = `You are an assistant that explains the 'What this means' section in more detail for a location, grounded in the provided metrics. Produce a skimmable breakdown with 5–9 bullets and one short paragraph. Be specific, neutral, and practical.`;
+    const sys = purpose === 'explain' ? sysExplain : sysQa;
 
-    async function call(model: string): Promise<Response> {
+    const baseUser = `Lat: ${lat}\nLon: ${lon}\nContext: ${JSON.stringify(context || {}, null, 2)}`;
+    const user = purpose === 'explain'
+      ? `Explain these results in more detail for a general audience. Focus on heat, hazards, air quality, and population context.\n${baseUser}`
+      : `Question: ${question}\n${baseUser}`;
+
+    // removed obsolete single-call helper
+
+    const primaryModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const thread: Array<{ role: 'system'|'user'|'assistant'; content: string }> = [{ role: 'system', content: sys }];
+    if (Array.isArray(history)) {
+      for (const m of history.slice(-10)) {
+        if (m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string') {
+          thread.push({ role: m.role, content: m.content });
+        }
+      }
+    }
+    thread.push({ role: 'user', content: user });
+
+    async function callWithMessages(model: string): Promise<Response> {
       return fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({
           model,
-          messages: [
-            { role: 'system', content: sys },
-            { role: 'user', content: user }
-          ],
-          temperature: 0.3,
-          max_tokens: 300
+          messages: thread,
+          temperature: purpose === 'explain' ? 0.4 : 0.3,
+          max_tokens: purpose === 'explain' ? 500 : 300,
         })
       });
     }
 
-    const primaryModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    let res: Response = await call(primaryModel);
+    let res: Response = await callWithMessages(primaryModel);
     let provider: 'openai' | 'groq' = 'openai';
     if (!res.ok) {
       const t1 = await res.text();
       // Try OpenAI fallback(s)
       const fallbackModel1 = primaryModel !== 'gpt-3.5-turbo' ? 'gpt-3.5-turbo' : 'gpt-4o-mini';
-      res = await call(fallbackModel1);
+      res = await callWithMessages(fallbackModel1);
       if (!res.ok) {
         const t2 = await res.text();
         const fallbackModel2 = 'gpt-4o-mini';
-        res = await call(fallbackModel2);
+        res = await callWithMessages(fallbackModel2);
         if (!res.ok) {
           const t3 = await res.text();
           // Try Groq if available
@@ -56,12 +71,9 @@ export async function POST(req: NextRequest) {
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gk}` },
               body: JSON.stringify({
                 model: groqModel,
-                messages: [
-                  { role: 'system', content: sys },
-                  { role: 'user', content: user }
-                ],
-                temperature: 0.3,
-                max_tokens: 300
+                messages: thread,
+                temperature: purpose === 'explain' ? 0.4 : 0.3,
+                max_tokens: purpose === 'explain' ? 500 : 300,
               })
             });
             if (!gres.ok) {

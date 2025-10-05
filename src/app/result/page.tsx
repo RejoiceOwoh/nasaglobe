@@ -16,6 +16,7 @@ type ScoreResult = {
     nearbyHazards?: { count: number; nearestKm?: number; categories: Record<string, number> };
     airQualityProxy?: number;
     airNow?: { pm25?: number; aqiUS?: number; observedAt?: string };
+  now?: { temperature_2m?: number; relative_humidity_2m?: number; apparent_temperature?: number; wind_speed_10m?: number; wind_gusts_10m?: number; precipitation?: number; cloud_cover?: number; uv_index?: number; time?: string };
     settlement?: { name?: string; class?: string; type?: string };
     healthBadge?: string;
     floodBadge?: string;
@@ -80,6 +81,8 @@ function ResultInner() {
   const advice = Array.isArray(data?.advice) ? data!.advice : [];
   const adviceSource = data?.adviceSource;
   const [qa, setQa] = useState<{ q: string; a: string; loading?: boolean; error?: string } | null>(null);
+  const [chat, setChat] = useState<Array<{ role: 'user'|'assistant'; content: string }>>([]);
+  const [explain, setExplain] = useState<{ loading?: boolean; error?: string; text?: string } | null>(null);
   const enableChat = process.env.NEXT_PUBLIC_ENABLE_CHAT !== 'false';
 
   function scoreColor(s: number) {
@@ -179,6 +182,14 @@ function ResultInner() {
               <Metric label="Nearby hazards (100 km)" value={metrics.nearbyHazards?.count ?? 0} hint="Open events from NASA EONET within 100 km." />
               <Metric label="Air quality proxy" value={metrics.airQualityProxy !== undefined ? metrics.airQualityProxy : undefined} hint="Derived from nearby smoke/dust/volcanic signals." />
               <Metric label="Air quality (PM2.5/AQI)" value={metrics.airNow?.aqiUS !== undefined ? `AQI ${metrics.airNow.aqiUS}${metrics.airNow.pm25 !== undefined ? ` • ${metrics.airNow.pm25} µg/m³` : ''}` : undefined} hint="Nearest OpenAQ observation (latest)." />
+              <Metric label="Now: Temp" value={metrics.now?.temperature_2m !== undefined ? `${metrics.now.temperature_2m.toFixed(1)} °C` : undefined} />
+              <Metric label="Now: Humidity" value={metrics.now?.relative_humidity_2m !== undefined ? `${metrics.now.relative_humidity_2m}%` : undefined} />
+              <Metric label="Now: Apparent" value={metrics.now?.apparent_temperature !== undefined ? `${metrics.now.apparent_temperature.toFixed(1)} °C` : undefined} />
+              <Metric label="Now: Wind" value={metrics.now?.wind_speed_10m !== undefined ? `${metrics.now.wind_speed_10m} m/s` : undefined} />
+              <Metric label="Now: Gusts" value={metrics.now?.wind_gusts_10m !== undefined ? `${metrics.now.wind_gusts_10m} m/s` : undefined} />
+              <Metric label="Now: Precip" value={metrics.now?.precipitation !== undefined ? `${metrics.now.precipitation} mm` : undefined} />
+              <Metric label="Now: Cloud" value={metrics.now?.cloud_cover !== undefined ? `${metrics.now.cloud_cover}%` : undefined} />
+              <Metric label="Now: UV Index" value={metrics.now?.uv_index !== undefined ? `${metrics.now.uv_index}` : undefined} />
             </div>
           )}
           {metrics.nearbyHazards?.categories && (
@@ -206,6 +217,34 @@ function ResultInner() {
               {advice.length ? advice.map((a, i) => <li key={i}>{a}</li>) : <li>No specific advisories for this location right now.</li>}
             </ul>
           )}
+          <div className="mt-3">
+            <button
+              onClick={async () => {
+                setExplain({ loading: true });
+                try {
+                  const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: 'Explain these results in more detail', lat, lon, context: metrics, purpose: 'explain' })
+                  });
+                  const j = await res.json();
+                  if (!res.ok) setExplain({ error: [j?.error, j?.detail].filter(Boolean).join(': ') || 'AI error' });
+                  else setExplain({ text: j?.answer });
+                } catch {
+                  setExplain({ error: 'Error contacting AI service' });
+                }
+              }}
+              className="px-3 py-2 rounded bg-neutral-800 hover:bg-neutral-700 text-xs"
+            >
+              {explain?.loading ? 'Generating explanation…' : 'Explain with AI'}
+            </button>
+            {explain?.error && <div className="text-xs text-red-400 mt-2">{explain.error}</div>}
+            {explain?.text && (
+              <div className="mt-2 text-sm text-neutral-200 whitespace-pre-wrap border border-neutral-800 rounded p-3 bg-neutral-900">
+                {explain.text}
+              </div>
+            )}
+          </div>
           <div className="text-xs text-neutral-500 mt-3">
             Sources: NASA POWER (heat), EONET (hazards), SEDAC GPW (population). Imagery and greenness via NASA GIBS.
             {adviceSource && (
@@ -247,7 +286,7 @@ function ResultInner() {
                     const res = await fetch('/api/chat', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ question: qa.q, lat, lon, context: metrics })
+                      body: JSON.stringify({ question: qa.q, lat, lon, context: metrics, history: chat })
                     });
                     const j = await res.json();
                     if (!res.ok) {
@@ -255,7 +294,9 @@ function ResultInner() {
                       const errMsg = [j?.error || 'AI error', detail].filter(Boolean).join(': ');
                       setQa({ q: qa.q, a: '', error: errMsg.slice(0, 800), loading: false });
                     } else {
-                      setQa({ q: qa.q, a: j?.answer ?? 'No answer', loading: false });
+                      const answer = j?.answer ?? 'No answer';
+                      setQa({ q: qa.q, a: answer, loading: false });
+                      setChat((h) => [...h, { role: 'user' as const, content: qa.q! }, { role: 'assistant' as const, content: answer }].slice(-12));
                     }
                   } catch {
                     setQa({ q: qa.q, a: '', error: 'Error contacting AI service.', loading: false });
@@ -264,6 +305,16 @@ function ResultInner() {
                 className="px-3 py-2 rounded bg-emerald-600 disabled:bg-neutral-700 hover:bg-emerald-500 text-sm font-medium"
               >Ask</button>
             </div>
+            {chat.length > 0 && (
+              <div className="mt-3 space-y-2 text-sm">
+                {chat.map((m, i) => (
+                  <div key={i} className={`p-2 rounded ${m.role === 'user' ? 'bg-neutral-800' : 'bg-neutral-900 border border-neutral-800'}`}>
+                    <div className="text-xs text-neutral-400 mb-1">{m.role === 'user' ? 'You' : 'AI'}</div>
+                    <div className="whitespace-pre-wrap">{m.content}</div>
+                  </div>
+                ))}
+              </div>
+            )}
             {qa?.error && (
               <div className="mt-3 text-sm text-red-400">{qa.error}</div>
             )}
