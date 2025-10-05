@@ -21,6 +21,7 @@ type ScoreResult = {
     recentHotDays?: number;
     populationDensity?: number;
     nearbyHazards?: { count: number; nearestKm?: number; categories: Record<string, number> };
+    airQualityProxy?: number;
   };
   score: number;
   advice: string[];
@@ -32,6 +33,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScoreResult | null>(null);
   const [picked, setPicked] = useState<{ lat: number; lon: number } | null>(null);
+  const [showTrueColor, setShowTrueColor] = useState(true);
+  const [showNdvi, setShowNdvi] = useState(true);
 
   const canScore = useMemo(() => typeof lat === 'number' && typeof lon === 'number' && !Number.isNaN(lat) && !Number.isNaN(lon), [lat, lon]);
 
@@ -68,6 +71,15 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  const metrics = result?.metrics ?? {};
+
+  function scoreColor(s: number) {
+    if (s >= 80) return "text-emerald-400";
+    if (s >= 60) return "text-yellow-300";
+    if (s >= 40) return "text-orange-400";
+    return "text-red-400";
   }
 
   return (
@@ -111,7 +123,15 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="h-[420px] mt-4 rounded overflow-hidden">
+          <div className="flex items-center gap-3 text-xs text-neutral-300 mt-3">
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={showTrueColor} onChange={() => setShowTrueColor(v=>!v)} /> True Color
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={showNdvi} onChange={() => setShowNdvi(v=>!v)} /> NDVI (greenery)
+            </label>
+          </div>
+          <div className="h-[420px] mt-2 rounded overflow-hidden border border-neutral-800">
             <MapClient
               picked={picked}
               onPick={(pt) => {
@@ -119,6 +139,7 @@ export default function Home() {
                 setLon(Number(pt.lon.toFixed(5)));
                 setPicked(pt);
               }}
+              overlays={{ trueColor: showTrueColor, ndvi: showNdvi }}
             />
           </div>
           <p className="text-xs text-neutral-400 mt-2">
@@ -132,19 +153,34 @@ export default function Home() {
           {result && (
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
-                <Metric label="Heat index (yesterday)" value={result.metrics.heatIndexF ? `${Math.round(result.metrics.heatIndexF)} °F` : '—'} />
-                <Metric label="Recent hot days (7d est.)" value={result.metrics.recentHotDays ?? '—'} />
-                <Metric label="Population density (SEDAC)" value={result.metrics.populationDensity !== undefined ? `${Math.round(result.metrics.populationDensity)} ppl/km²` : '—'} />
-                <Metric label="Nearby hazards (EONET, 100 km)" value={result.metrics.nearbyHazards?.count ?? 0} />
+                <Metric label="Heat index (yesterday)" value={metrics.heatIndexF !== undefined ? `${Math.round(metrics.heatIndexF)} °F` : '—'} />
+                <Metric label="Recent hot days (7d est.)" value={metrics.recentHotDays ?? '—'} />
+                <Metric label="Population density (SEDAC)" value={metrics.populationDensity !== undefined ? `${Math.round(metrics.populationDensity)} ppl/km²` : '—'} />
+                <Metric label="Nearby hazards (EONET, 100 km)" value={metrics.nearbyHazards?.count ?? 0} />
+                <Metric label="Air quality proxy" value={metrics.airQualityProxy !== undefined ? `${metrics.airQualityProxy}` : '—'} />
               </div>
+              {metrics.nearbyHazards?.categories && (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {Object.entries(metrics.nearbyHazards.categories).map(([k, v]) => (
+                    <span key={k} className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700">
+                      <b className="text-xs">{k}</b>
+                      <span className="text-xs text-neutral-400">{v}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
               <div>
                 <div className="text-neutral-300 font-medium mt-2">Advice</div>
                 <ul className="list-disc ml-5 mt-1 space-y-1">
                   {result.advice.map((a, i) => (<li key={i}>{a}</li>))}
                 </ul>
               </div>
-              <div className="text-xl font-semibold">
-                Liveability score: <span className="text-emerald-400">{Math.round(result.score)}</span>/100
+              <div className="text-xl font-semibold flex items-center gap-2">
+                Liveability score:
+                <span className={`inline-flex items-center justify-center w-12 h-12 rounded-full border border-neutral-700 bg-neutral-800 ${scoreColor(result.score)}`}>
+                  {Math.round(result.score)}
+                </span>
+                /100
               </div>
               <div className="text-xs text-neutral-500">
                 Data sources: NASA POWER (heat), EONET (hazards), SEDAC GPW (pop). NDVI and imagery shown on map via NASA GIBS.

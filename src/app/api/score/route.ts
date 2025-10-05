@@ -90,12 +90,13 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // EONET nearby hazards count within 100 km
+    // EONET nearby hazards count within 100 km (and air-quality proxy within 300 km)
   type EonetEvent = { id: string; title: string; link?: string; categories?: { id?: string; title: string }[]; geometry?: { type: string; coordinates: [number, number] }[] };
   const events: EonetEvent[] = Array.isArray(eonetJson?.events) ? eonetJson.events as EonetEvent[] : [];
     let hazardCount = 0;
     let nearestKm: number | undefined;
     const categories: Record<string, number> = {};
+  let aqPenalty = 0; // accumulate penalties for air quality proxy
     for (const ev of events) {
       const g = ev.geometry?.[ev.geometry.length - 1];
       if (!g || g.type !== 'Point') continue;
@@ -107,7 +108,19 @@ export async function GET(req: NextRequest) {
         const cat = ev.categories?.[0]?.title ?? 'Other';
         categories[cat] = (categories[cat] || 0) + 1;
       }
+      // Air quality proxy penalties for smoke/dust emitting hazards
+      const catTitle = ev.categories?.[0]?.title ?? '';
+      if (catTitle === 'Wildfires') {
+        if (d <= 100) aqPenalty += 30; else if (d <= 300) aqPenalty += 15;
+      } else if (catTitle === 'Dust and Haze') {
+        if (d <= 150) aqPenalty += 20; else if (d <= 300) aqPenalty += 10;
+      } else if (catTitle === 'Volcanoes') {
+        if (d <= 150) aqPenalty += 15; else if (d <= 300) aqPenalty += 8;
+      }
     }
+
+  // Air quality proxy (0 bad -> 100 good), start from 95 and subtract capped penalties
+  const airQualityProxy = Math.max(0, Math.min(100, Math.round(95 - Math.min(60, aqPenalty))));
 
     // SEDAC population density value
     let popDensity: number | undefined;
@@ -119,8 +132,8 @@ export async function GET(req: NextRequest) {
 
     // scoring
     // components: heat burden (0-40), hazards proximity (0-30), population pressure (0-20), baseline (10)
-    let score = 10;
-    const advice: string[] = [];
+  let score = 10;
+  const advice: string[] = [];
 
     if (heatIndexFVal !== undefined) {
       const hi = heatIndexFVal;
@@ -153,6 +166,31 @@ export async function GET(req: NextRequest) {
 
     score = Math.max(0, Math.min(100, Math.round(score)));
 
+    // AI-style narrative (rule-based summarizer)
+    const narrative: string[] = [];
+    if (heatIndexFVal !== undefined) {
+      if (heatIndexFVal >= 105) narrative.push("Severe heat burden detected. Expect hazardous mid-day conditions; prioritize indoor cooling and hydration.");
+      else if (heatIndexFVal >= 95) narrative.push("Elevated heat conditions likely; plan outdoor activities for mornings/evenings.");
+      else narrative.push("Heat levels appear manageable for typical outdoor activities.");
+    }
+    if (hazardCount > 0) {
+      const nearTxt = nearestKm !== undefined ? ` The nearest recent event is about ${Math.round(nearestKm)} km away.` : '';
+      const cats = Object.entries(categories).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k,v])=>`${k.toLowerCase()} (${v})`).join(', ');
+      narrative.push(`Recent hazards nearby: ${hazardCount} in the last window, mostly ${cats || 'varied types'}.${nearTxt}`);
+    } else {
+      narrative.push("No recent hazard activity detected within 100 km.");
+    }
+    if (typeof popDensity === 'number') {
+      if (popDensity > 10000) narrative.push("This area is very dense—expect urban noise, traffic, and fewer green buffers.");
+      else if (popDensity > 3000) narrative.push("Moderate-to-high density suggests good access to services with some crowding.");
+      else narrative.push("Lower density may offer quieter living with more open space.");
+    }
+    if (typeof airQualityProxy === 'number') {
+      if (airQualityProxy < 40) narrative.push("Air quality risks are elevated due to nearby smoke/dust sources—consider indoor air filtration.");
+      else if (airQualityProxy < 70) narrative.push("Mild air quality concerns are possible; check daily conditions if sensitive.");
+      else narrative.push("Air quality signals look favorable at this time.");
+    }
+
     const payload = {
       input: { lat, lon },
       metrics: {
@@ -160,9 +198,10 @@ export async function GET(req: NextRequest) {
         recentHotDays,
         populationDensity: popDensity,
         nearbyHazards: { count: hazardCount, nearestKm, categories },
+        airQualityProxy,
       },
       score,
-      advice: advice.length ? advice : ["No major concerns detected from recent Earth observation indicators."]
+      advice: (advice.length ? advice : ["No major concerns detected from recent Earth observation indicators."]).concat(narrative)
     };
 
     return NextResponse.json(payload, { headers: { 'Cache-Control': 's-maxage=600, stale-while-revalidate=600' } });

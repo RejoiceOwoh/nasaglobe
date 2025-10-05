@@ -16,9 +16,11 @@ const icon: Icon = new L.Icon({
 export default function MapClient({
   picked,
   onPick,
+  overlays,
 }: {
   picked: { lat: number; lon: number } | null;
   onPick: (pt: { lat: number; lon: number }) => void;
+  overlays?: { trueColor?: boolean; ndvi?: boolean };
 }) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const gibsTrueColor = useMemo(
@@ -52,8 +54,12 @@ export default function MapClient({
     >
       <ClickPicker />
       <TileLayer attribution="© OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <TileLayer attribution="Imagery © NASA GIBS" url={gibsTrueColor} opacity={0.85} />
-      <TileLayer attribution="NDVI © NASA GIBS" url={ndvi} opacity={0.4} />
+      {overlays?.trueColor !== false && (
+        <TileLayer attribution="Imagery © NASA GIBS" url={gibsTrueColor} opacity={0.85} />
+      )}
+      {overlays?.ndvi !== false && (
+        <TileLayer attribution="NDVI © NASA GIBS" url={ndvi} opacity={0.4} />
+      )}
       {picked && (
         <Marker position={([picked.lat, picked.lon] as unknown) as LatLngExpression} icon={icon}>
           <Popup>

@@ -1,37 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## NASA Liveability Advisor
 
-## Getting Started
+An interactive tool that scores any location for livability using NASA Earth observation data. Users can click the map or use device geolocation and receive a 0–100 score, metrics, and plain-language advice. Built with Next.js (App Router) and deployable to Vercel.
 
-First, run the development server:
+### Tech Stack
+- Next.js 15 (App Router)
+- React 19
+- Tailwind CSS v4
+- Leaflet + react-leaflet
+- NASA POWER, EONET, SEDAC WMS, and GIBS WMTS
 
+### Run Locally
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
+Open http://localhost:3000
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Deploy on Vercel
+Push this repo and import it into Vercel. Default settings work:
+- Build: `next build`
+- Output: Serverless functions for `/api/*`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Files of Interest
+- `src/app/page.tsx` — UI: inputs, map, results panel, overlay toggles
+- `src/components/MapClient.tsx` — Map with NASA GIBS overlays and click-to-pick
+- `src/app/api/score/route.ts` — Scoring API using POWER/EONET/SEDAC
+- `src/app/globals.css` — Tailwind + Leaflet CSS imports
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Docs
+See `TECHNICAL_DOCS.md` for data sources, methods, and architecture.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# nasaglobe
+### Notes
+- POWER data is typically delayed by ~1 day; Heat Index is based on the most recent day available.
+- Air quality proxy is derived from EONET wildfire/dust/volcano signals.
