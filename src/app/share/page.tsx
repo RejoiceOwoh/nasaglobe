@@ -1,45 +1,140 @@
-export const dynamic = 'force-static';
+"use client";
+
+import { useState } from "react";
 
 export default function SharePage() {
+  const [lat, setLat] = useState<string>("");
+  const [lon, setLon] = useState<string>("");
+  const [locating, setLocating] = useState(false);
+
+  async function useMyLocation() {
+    if (!navigator.geolocation) {
+      alert("Geolocation not supported");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLat(pos.coords.latitude.toFixed(6));
+        setLon(pos.coords.longitude.toFixed(6));
+        setLocating(false);
+      },
+      (err) => {
+        alert(err.message);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+
   return (
     <div className="min-h-screen p-6 sm:p-10 bg-neutral-950 text-neutral-100">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <h1 className="text-xl sm:text-2xl font-semibold">Share input about your location</h1>
-        <p className="text-sm text-neutral-400 mt-1">Your insights help others. Submissions go to our inbox securely.</p>
+        <p className="text-sm text-neutral-400 mt-1">Help others with firsthand insights about heat, air, flooding, and safe living. Your submission goes directly to our inbox.</p>
+
         <form
-          action="https://submit-form.com/2g6oZ1Z2"
+          action="https://formsubmit.co/rejoicecorporations@gmail.com"
           method="POST"
-          className="mt-6 space-y-3"
+          encType="multipart/form-data"
+          className="mt-6 grid gap-4"
         >
-          <input type="hidden" name="_redirect" value="/thanks" />
-          <input type="hidden" name="_email.to" value="rejoicecorporations@gmail.com" />
-          <input type="hidden" name="_email.template.title" value="New Eco-Safe Location Input" />
-          <input type="hidden" name="_email.subject" value="Eco-Safe community input" />
-          <div>
-            <label className="block text-xs text-neutral-400 mb-1">Your name</label>
-            <input name="name" required className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" />
+          {/* FormSubmit options */}
+          <input type="hidden" name="_next" value="/thanks" />
+          <input type="hidden" name="_subject" value="New Eco-Safe community input" />
+          <input type="hidden" name="_template" value="table" />
+          <input type="hidden" name="_captcha" value="true" />
+          <input type="text" name="_honey" className="hidden" tabIndex={-1} autoComplete="off" />
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Your name</label>
+              <input name="name" required className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="Jane Doe" />
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Email (for reply)</label>
+              <input name="email" type="email" required className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="you@example.com" />
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-2">
+              <label className="block text-xs text-neutral-400 mb-1">Location name (city, area, landmark)</label>
+              <input name="location" className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="e.g., Victoria Island, Lagos" />
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Country</label>
+              <input name="country" className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="Nigeria" />
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4 items-end">
             <div>
               <label className="block text-xs text-neutral-400 mb-1">Latitude</label>
-              <input name="latitude" type="text" className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" />
+              <input name="latitude" value={lat} onChange={(e)=>setLat(e.target.value)} className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="6.5244" />
             </div>
             <div>
               <label className="block text-xs text-neutral-400 mb-1">Longitude</label>
-              <input name="longitude" type="text" className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" />
+              <input name="longitude" value={lon} onChange={(e)=>setLon(e.target.value)} className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="3.3792" />
+            </div>
+            <div>
+              <button type="button" onClick={useMyLocation} className="px-3 py-2 rounded bg-sky-600 hover:bg-sky-500 text-sm font-medium w-full" disabled={locating}>
+                {locating ? 'Getting location…' : 'Use my location'}
+              </button>
             </div>
           </div>
-          <div>
-            <label className="block text-xs text-neutral-400 mb-1">Location name (city, area)</label>
-            <input name="location" className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" />
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Observations (select all that apply)</label>
+              <div className="flex flex-wrap gap-2 text-xs text-neutral-200">
+                {['Extreme heat','Poor air quality','Frequent flooding','Dust/Smoke','Noise','Water scarcity','Power outages'].map((t)=> (
+                  <label key={t} className="inline-flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded px-2 py-1">
+                    <input type="checkbox" name="tags" value={t} /> {t}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Time of day</label>
+              <select name="time_of_day" className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2">
+                {['Morning','Afternoon','Evening','Night'].map((t)=> <option key={t} value={t}>{t}</option>)}
+              </select>
+              <label className="block text-xs text-neutral-400 mb-1 mt-3">Season</label>
+              <select name="season" className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2">
+                {['Dry','Rainy','Harmattan','Winter','Summer'].map((t)=> <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
           </div>
+
           <div>
-            <label className="block text-xs text-neutral-400 mb-1">Your input</label>
-            <textarea name="message" required rows={6} className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="Share tips about heat, air, flood, safe routes, and local knowledge." />
+            <label className="block text-xs text-neutral-400 mb-1">Describe your experience</label>
+            <textarea name="message" required rows={8} className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="Share details: temperature feel, shade/green cover, air smell/visibility, standing water, safe routes, etc." />
           </div>
-          <div className="flex items-center gap-3">
+
+          <div>
+            <label className="block text-xs text-neutral-400 mb-1">Attach photos (optional)</label>
+            <input type="file" name="attachments" accept="image/png, image/jpeg" multiple className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" />
+            <div className="text-[11px] text-neutral-500 mt-1">Max total 5MB</div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Phone (optional)</label>
+              <input name="phone" className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="+234…" />
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Allow us to contact you?</label>
+              <select name="consent_contact" className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2">
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
             <button className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-sm font-medium">Submit</button>
-            <span className="text-xs text-neutral-500">Powered by submit-form.com</span>
+            <span className="text-xs text-neutral-500">Powered by formsubmit.co</span>
           </div>
         </form>
       </div>
