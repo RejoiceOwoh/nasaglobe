@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 type ScoreResult = {
   input: { lat: number; lon: number };
@@ -17,6 +17,7 @@ type ScoreResult = {
   };
   score: number;
   advice: string[];
+  adviceSource?: 'llm' | 'rule';
 };
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -39,13 +40,14 @@ function Metric({ label, value, hint }: { label: string; value: string | number 
   );
 }
 
-export default function ResultPage() {
+function ResultInner() {
   const params = useSearchParams();
   const lat = useMemo(() => Number(params.get('lat')), [params]);
   const lon = useMemo(() => Number(params.get('lon')), [params]);
   const valid = Number.isFinite(lat) && Number.isFinite(lon);
 
   const [data, setData] = useState<ScoreResult | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
@@ -58,7 +60,7 @@ export default function ResultPage() {
       } catch {
         if (alive) setData(null);
       } finally {
-        // no-op
+        if (alive) setLoading(false);
       }
     }
     run();
@@ -68,6 +70,8 @@ export default function ResultPage() {
   const score = data?.score ?? 50;
   const metrics = data?.metrics ?? {};
   const advice = Array.isArray(data?.advice) ? data!.advice : [];
+  const adviceSource = data?.adviceSource;
+  const [qa, setQa] = useState<{ q: string; a: string; loading?: boolean } | null>(null);
 
   function scoreColor(s: number) {
     if (s >= 80) return "text-emerald-400";
@@ -85,20 +89,51 @@ export default function ResultPage() {
             <div className="text-xs text-neutral-400">{lat.toFixed(5)}, {lon.toFixed(5)}</div>
           )}
         </div>
-        <Link href="/" className="px-3 py-2 rounded bg-sky-600 hover:bg-sky-500 text-sm font-medium">Score another location</Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              const url = typeof window !== 'undefined' ? window.location.href : '';
+              try {
+                if (navigator.share) {
+                  await navigator.share({ title: 'NASA Liveability Score', url });
+                } else if (navigator.clipboard) {
+                  await navigator.clipboard.writeText(url);
+                  alert('Link copied to clipboard');
+                }
+              } catch {
+                // ignore
+              }
+            }}
+            className="px-3 py-2 rounded bg-neutral-800 hover:bg-neutral-700 text-sm"
+            title="Share this result"
+          >
+            Share/Copy
+          </button>
+          <Link href="/" className="px-3 py-2 rounded bg-sky-600 hover:bg-sky-500 text-sm font-medium">Score another location</Link>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <Card>
           <div className="text-neutral-300 font-medium mb-3">Overview</div>
-          <div className="flex items-center gap-4">
-            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full border border-neutral-700 bg-neutral-800 ${scoreColor(score)} text-2xl`}>
-              {Math.round(score)}
+          {loading ? (
+            <div className="animate-pulse">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-neutral-800 border border-neutral-700" />
+                <div className="h-10 w-48 bg-neutral-800 rounded" />
+              </div>
+              <div className="h-4 w-64 bg-neutral-800 rounded mt-4" />
             </div>
-            <div className="text-sm text-neutral-300">
-              Overall livability score based on recent heat, hazards, population pressure, and air quality proxy.
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full border border-neutral-700 bg-neutral-800 ${scoreColor(score)} text-2xl`}>
+                {Math.round(score)}
+              </div>
+              <div className="text-sm text-neutral-300">
+                Overall livability score based on recent heat, hazards, population pressure, and air quality proxy.
+              </div>
             </div>
-          </div>
+          )}
           {(metrics.healthBadge || metrics.floodBadge) && (
             <div className="flex flex-wrap gap-2 mt-3">
               {metrics.healthBadge && (
@@ -117,13 +152,24 @@ export default function ResultPage() {
 
         <Card>
           <div className="text-neutral-300 font-medium mb-3">Key Metrics</div>
-          <div className="grid grid-cols-2 gap-3">
-            <Metric label="Heat index (yesterday)" value={metrics.heatIndexF !== undefined ? `${Math.round(metrics.heatIndexF)} °F` : undefined} hint="How hot it feels combining temperature and humidity." />
-            <Metric label="Recent hot days (7d)" value={metrics.recentHotDays} hint="Number of days with dangerous heat index in the last week." />
-            <Metric label="Population density" value={metrics.populationDensity !== undefined ? `${Math.round(metrics.populationDensity)} ppl/km²` : undefined} hint="People per square kilometer (SEDAC GPW)." />
-            <Metric label="Nearby hazards (100 km)" value={metrics.nearbyHazards?.count ?? 0} hint="Open events from NASA EONET within 100 km." />
-            <Metric label="Air quality proxy" value={metrics.airQualityProxy !== undefined ? metrics.airQualityProxy : undefined} hint="Derived from nearby smoke/dust/volcanic signals." />
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-2 gap-3 animate-pulse">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="rounded border border-neutral-800 bg-neutral-900 p-3">
+                  <div className="h-3 w-24 bg-neutral-800 rounded" />
+                  <div className="h-5 w-16 bg-neutral-800 rounded mt-2" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Metric label="Heat index (yesterday)" value={metrics.heatIndexF !== undefined ? `${Math.round(metrics.heatIndexF)} °F` : undefined} hint="How hot it feels combining temperature and humidity." />
+              <Metric label="Recent hot days (7d)" value={metrics.recentHotDays} hint="Number of days with dangerous heat index in the last week." />
+              <Metric label="Population density" value={metrics.populationDensity !== undefined ? `${Math.round(metrics.populationDensity)} ppl/km²` : undefined} hint="People per square kilometer (SEDAC GPW)." />
+              <Metric label="Nearby hazards (100 km)" value={metrics.nearbyHazards?.count ?? 0} hint="Open events from NASA EONET within 100 km." />
+              <Metric label="Air quality proxy" value={metrics.airQualityProxy !== undefined ? metrics.airQualityProxy : undefined} hint="Derived from nearby smoke/dust/volcanic signals." />
+            </div>
+          )}
           {metrics.nearbyHazards?.categories && (
             <div className="flex flex-wrap gap-2 mt-3">
               {Object.entries(metrics.nearbyHazards.categories).map(([k, v]) => (
@@ -138,10 +184,23 @@ export default function ResultPage() {
 
         <Card>
           <div className="text-neutral-300 font-medium mb-3">What this means</div>
-          <ul className="list-disc ml-5 mt-1 space-y-1 text-sm">
-            {advice.length ? advice.map((a, i) => <li key={i}>{a}</li>) : <li>No specific advisories for this location right now.</li>}
-          </ul>
-          <div className="text-xs text-neutral-500 mt-3">Sources: NASA POWER (heat), EONET (hazards), SEDAC GPW (population). Imagery and greenness via NASA GIBS.</div>
+          {loading ? (
+            <div className="space-y-2 animate-pulse">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-4 w-full bg-neutral-800 rounded" />
+              ))}
+            </div>
+          ) : (
+            <ul className="list-disc ml-5 mt-1 space-y-1 text-sm">
+              {advice.length ? advice.map((a, i) => <li key={i}>{a}</li>) : <li>No specific advisories for this location right now.</li>}
+            </ul>
+          )}
+          <div className="text-xs text-neutral-500 mt-3">
+            Sources: NASA POWER (heat), EONET (hazards), SEDAC GPW (population). Imagery and greenness via NASA GIBS.
+            {adviceSource && (
+              <span className="ml-2 text-neutral-400">Narrative source: {adviceSource === 'llm' ? 'AI-generated' : 'Rule-based'}</span>
+            )}
+          </div>
         </Card>
 
         {valid && (
@@ -157,7 +216,51 @@ export default function ResultPage() {
             </ul>
           </Card>
         )}
+
+        {valid && (
+          <Card>
+            <div className="text-neutral-300 font-medium mb-3">Ask AI about this place</div>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm"
+                placeholder="e.g., Is it safe to run outside in the afternoon?"
+                value={qa?.q ?? ''}
+                onChange={(e) => setQa({ q: e.target.value, a: qa?.a ?? '' })}
+              />
+              <button
+                disabled={!(qa?.q) || loading}
+                onClick={async () => {
+                  if (!qa?.q) return;
+                  setQa({ q: qa.q, a: '', loading: true });
+                  try {
+                    const res = await fetch('/api/chat', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ question: qa.q, lat, lon, context: metrics })
+                    });
+                    const j = await res.json();
+                    setQa({ q: qa.q, a: j?.answer ?? 'No answer', loading: false });
+                  } catch {
+                    setQa({ q: qa.q, a: 'Error contacting AI service.', loading: false });
+                  }
+                }}
+                className="px-3 py-2 rounded bg-emerald-600 disabled:bg-neutral-700 hover:bg-emerald-500 text-sm font-medium"
+              >Ask</button>
+            </div>
+            {qa?.a && (
+              <div className="mt-3 text-sm text-neutral-200 whitespace-pre-wrap">{qa.a}</div>
+            )}
+          </Card>
+        )}
       </div>
     </div>
+  );
+}
+
+export default function ResultPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen p-6 sm:p-10 bg-neutral-950 text-neutral-400">Loading results…</div>}>
+      <ResultInner />
+    </Suspense>
   );
 }

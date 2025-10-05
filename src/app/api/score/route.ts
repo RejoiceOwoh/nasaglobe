@@ -268,11 +268,12 @@ export async function GET(req: NextRequest) {
       if (key) {
         const sys = 'You are a concise housing liveability advisor using NASA Earth data. Write 3-6 bullet points: actionable, neutral tone, avoid absolutes. Include specific references to heat, hazards, density, and air quality proxy. Keep each bullet under 25 words.';
         const user = JSON.stringify({ lat, lon, score, metrics: { heatIndexF: heatIndexFVal, recentHotDays, hazardCount, nearestKm, categories, populationDensity: popDensity, airQualityProxy } });
+        const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
           body: JSON.stringify({
-            model: 'gpt-4o-mini',
+            model,
             messages: [
               { role: 'system', content: sys },
               { role: 'user', content: `Create bullet guidance for this location data: ${user}` }
@@ -313,7 +314,8 @@ export async function GET(req: NextRequest) {
       },
       score,
       advice: (llmAdvice && llmAdvice.length ? llmAdvice : (advice.length ? advice : ["No major concerns detected from recent Earth observation indicators."]))
-        .concat(narrative)
+        .concat(narrative),
+      adviceSource: llmAdvice && llmAdvice.length ? 'llm' : 'rule'
     };
 
     return NextResponse.json(payload, { headers: { 'Cache-Control': 's-maxage=600, stale-while-revalidate=600' } });

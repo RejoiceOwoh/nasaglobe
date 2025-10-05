@@ -18,9 +18,11 @@ The solution is serverless and deploys cleanly to Vercel.
   - NASA GIBS WMTS: Map imagery overlays (True Color; NDVI)
 
 ## Key Files
-- `src/app/page.tsx` — Main UI: inputs, geolocation, map, results, overlay toggles
+- `src/app/page.tsx` — Main UI: inputs, geolocation, map, overlay toggles, Discover grid
 - `src/components/MapClient.tsx` — Leaflet map with OSM base + GIBS overlays; click-to-pick
-- `src/app/api/score/route.ts` — Scoring route with POWER/EONET/SEDAC integration
+- `src/app/result/page.tsx` — Dedicated results route with score, metrics, narrative
+- `src/components/FeaturedCities.tsx` — Discover grid linking to results
+- `src/app/api/score/route.ts` — Scoring route with POWER/EONET/SEDAC integration (+ optional OpenAI)
 - `src/app/globals.css` — Tailwind and Leaflet CSS imports
 
 ## Data & Methods
@@ -55,6 +57,13 @@ The solution is serverless and deploys cleanly to Vercel.
 - Clamped to [0, 100]
 - Advice: Rule-based messages for heat, hazards, density, and AQP
 
+### Badges
+- Health badge derived from Heat Index category (Low → Extreme)
+- Flood badge set when EONET reports an open Flood event within ~100 km
+
+### Optional LLM Narrative
+If `OPENAI_API_KEY` is present, the API will ask OpenAI (model: `gpt-4o-mini`) to produce 3–6 concise, actionable bullets based on the computed metrics. Errors or missing keys fall back to the rule-based narrative only.
+
 ## UI Details
 - Dark theme with neutral accents
 - Cards for inputs and results
@@ -73,7 +82,8 @@ Open http://localhost:3000 and interact.
 - Push to GitHub and import the repo into Vercel.
 - Build command: `next build`
 - Output: Serverless functions for API routes; static assets for UI.
-- No environment variables required.
+- No environment variables required for core features.
+- Optional: `OPENAI_API_KEY` for richer narrative.
 
 ## Limitations & Notes
 - CORS and rate limits: All data sources are public and CORS-friendly at modest rates.
