@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const notes: string[] = [];
     const today = new Date();
     const y = new Date(today);
     y.setDate(y.getDate() - 1);
@@ -61,30 +62,53 @@ export async function GET(req: NextRequest) {
     });
     const sedacUrl = `${sedacBase}?${sedacParams.toString()}`;
 
-    const [powerRes, eonetRes, sedacRes] = await Promise.all([
-      fetch(powerUrl, { cache: 'no-store' }),
-      fetch(eonetUrl, { cache: 'no-store' }),
-      fetch(sedacUrl, { cache: 'no-store' }),
-    ]);
+    // Helper: fetch with timeout and safe JSON parsing
+  async function fetchJson(url: string, timeoutMs = 9000): Promise<unknown | null> {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+        if (!res.ok) return null;
+        const text = await res.text();
+        try { return JSON.parse(text); } catch { return null; }
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(t);
+      }
+    }
 
-    const powerJson = await powerRes.json();
-    const eonetJson = await eonetRes.json();
-    const sedacJson = await sedacRes.json();
+    const [powerJson, eonetJson, sedacJson] = await Promise.all([
+      fetchJson(powerUrl),
+      fetchJson(eonetUrl),
+      fetchJson(sedacUrl),
+    ]);
+    if (!powerJson) notes.push('POWER unavailable; some heat metrics may be approximate.');
+    if (!eonetJson) notes.push('EONET unavailable; hazards may be undercounted.');
+    if (!sedacJson) notes.push('SEDAC unavailable; population density omitted.');
+
+    type PowerResponse = { properties?: { parameter?: { T2M_MAX?: Record<string, number>; RH2M?: Record<string, number> } } };
+    type EonetResponse = { events?: Array<{ categories?: Array<{ title?: string }>; geometry?: Array<{ type: string; coordinates: [number, number] }> }> };
+    type SedacFeatureCollection = { features?: Array<{ properties?: Record<string, number> }> };
+
+    const power = (powerJson || null) as PowerResponse | null;
+    const eonet = (eonetJson || null) as EonetResponse | null;
+    const sedac = (sedacJson || null) as SedacFeatureCollection | null;
 
     // POWER parse
-    const days = powerJson?.properties?.parameter?.T2M_MAX ? Object.keys(powerJson.properties.parameter.T2M_MAX) : [];
+  const days = power?.properties?.parameter?.T2M_MAX ? Object.keys(power.properties.parameter.T2M_MAX) : [];
     const lastKey = days[days.length - 1];
     let heatIndexFVal: number | undefined;
     let recentHotDays = 0;
     if (lastKey) {
-      const tmaxC = powerJson.properties.parameter.T2M_MAX[lastKey];
-      const rh = powerJson.properties.parameter.RH2M?.[lastKey] ?? 50;
+  const tmaxC = power!.properties!.parameter!.T2M_MAX![lastKey]!;
+  const rh = power!.properties!.parameter!.RH2M?.[lastKey] ?? 50;
       const tF = tmaxC * 9/5 + 32;
       heatIndexFVal = heatIndexF(tF, rh);
       // rough count of days with heat index > 100F in window
       for (const k of days) {
-        const tC = powerJson.properties.parameter.T2M_MAX[k];
-        const rhD = powerJson.properties.parameter.RH2M?.[k] ?? 50;
+  const tC = power!.properties!.parameter!.T2M_MAX![k]!;
+  const rhD = power!.properties!.parameter!.RH2M?.[k] ?? 50;
         const tFD = tC * 9/5 + 32;
         if (heatIndexF(tFD, rhD) > 100) recentHotDays++;
       }
@@ -92,7 +116,7 @@ export async function GET(req: NextRequest) {
 
     // EONET nearby hazards count within 100 km (and air-quality proxy within 300 km)
   type EonetEvent = { id: string; title: string; link?: string; categories?: { id?: string; title: string }[]; geometry?: { type: string; coordinates: [number, number] }[] };
-  const events: EonetEvent[] = Array.isArray(eonetJson?.events) ? eonetJson.events as EonetEvent[] : [];
+  const events: EonetEvent[] = Array.isArray(eonet?.events) ? (eonet!.events as EonetEvent[]) : [];
     let hazardCount = 0;
     let nearestKm: number | undefined;
     const categories: Record<string, number> = {};
@@ -125,10 +149,12 @@ export async function GET(req: NextRequest) {
     // SEDAC population density value
     let popDensity: number | undefined;
     try {
-      const feat = sedacJson?.features?.[0];
+  const feat = sedac?.features?.[0];
       const val = feat?.properties?.GRAY_INDEX ?? feat?.properties?.gridcode ?? feat?.properties?.DN;
       if (typeof val === 'number') popDensity = val;
-    } catch {}
+    } catch {
+      // ignore
+    }
 
     // scoring
     // components: heat burden (0-40), hazards proximity (0-30), population pressure (0-20), baseline (10)
@@ -167,7 +193,7 @@ export async function GET(req: NextRequest) {
     score = Math.max(0, Math.min(100, Math.round(score)));
 
     // AI-style narrative (rule-based summarizer)
-    const narrative: string[] = [];
+  const narrative: string[] = [];
     if (heatIndexFVal !== undefined) {
       if (heatIndexFVal >= 105) narrative.push("Severe heat burden detected. Expect hazardous mid-day conditions; prioritize indoor cooling and hydration.");
       else if (heatIndexFVal >= 95) narrative.push("Elevated heat conditions likely; plan outdoor activities for mornings/evenings.");
@@ -190,6 +216,7 @@ export async function GET(req: NextRequest) {
       else if (airQualityProxy < 70) narrative.push("Mild air quality concerns are possible; check daily conditions if sensitive.");
       else narrative.push("Air quality signals look favorable at this time.");
     }
+    if (notes.length) narrative.push(...notes.map(n => `Note: ${n}`));
 
     const payload = {
       input: { lat, lon },
@@ -206,6 +233,15 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(payload, { headers: { 'Cache-Control': 's-maxage=600, stale-while-revalidate=600' } });
   } catch {
-    return NextResponse.json({ error: 'Failed to score location' }, { status: 500 });
+    // Last-resort fallback: never 500
+    return NextResponse.json({
+      input: { lat, lon },
+      metrics: {},
+      score: 50,
+      advice: [
+        'Temporary data issue: returning a neutral score.',
+        'Try again in a moment; upstream services may be slow.'
+      ]
+    });
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
 import * as L from "leaflet";
 import type { LeafletMouseEvent, LatLngExpression, Icon } from "leaflet";
 import { useMemo } from "react";
@@ -45,6 +45,12 @@ export default function MapClient({
     return null;
   }
 
+  function Recenter({ center }: { center: [number, number] }) {
+    const map = useMap();
+    map.flyTo(center, picked ? 12 : 2, { duration: 0.6 });
+    return null;
+  }
+
   return (
     <MapContainer
       center={(picked ? [picked.lat, picked.lon] : [20, 0]) as LatLngExpression}
@@ -55,6 +61,7 @@ export default function MapClient({
       scrollWheelZoom
     >
       <ClickPicker />
+      {picked && <Recenter center={[picked.lat, picked.lon]} />}
       {base === 'osm' && (
         <TileLayer attribution="© OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       )}
