@@ -6,6 +6,8 @@ export default function SharePage() {
   const [lat, setLat] = useState<string>("");
   const [lon, setLon] = useState<string>("");
   const [locating, setLocating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function useMyLocation() {
     if (!navigator.geolocation) {
@@ -35,15 +37,41 @@ export default function SharePage() {
 
         <form
           action="https://formsubmit.co/rejoicecorporations@gmail.com"
-          method="POST"
+          method="post"
           encType="multipart/form-data"
           className="mt-6 grid gap-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setErrorMsg(null);
+            setSubmitting(true);
+            try {
+              const formEl = e.currentTarget as HTMLFormElement;
+              const fd = new FormData(formEl);
+              const res = await fetch('https://formsubmit.co/ajax/rejoicecorporations@gmail.com', {
+                method: 'POST',
+                body: fd,
+                headers: { 'Accept': 'application/json' },
+              });
+              if (!res.ok) {
+                const txt = await res.text();
+                setErrorMsg(txt || 'Submission failed');
+                setSubmitting(false);
+                return;
+              }
+              // success → redirect
+              window.location.href = '/thanks';
+            } catch {
+              setErrorMsg('Network error while submitting.');
+              setSubmitting(false);
+            }
+          }}
         >
           {/* FormSubmit options */}
           <input type="hidden" name="_next" value="/thanks" />
           <input type="hidden" name="_subject" value="New Eco-Safe community input" />
           <input type="hidden" name="_template" value="table" />
           <input type="hidden" name="_captcha" value="true" />
+          <input type="hidden" name="_autoresponse" value="Thanks for sharing your Eco-Safe input. We received your submission and will review it. — Eco-Safe" />
           <input type="text" name="_honey" className="hidden" tabIndex={-1} autoComplete="off" />
 
           <div className="grid sm:grid-cols-2 gap-4">
@@ -54,6 +82,7 @@ export default function SharePage() {
             <div>
               <label className="block text-xs text-neutral-400 mb-1">Email (for reply)</label>
               <input name="email" type="email" required className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2" placeholder="you@example.com" />
+              <input type="hidden" name="_replyto" value="{{email}}" />
             </div>
           </div>
 
@@ -133,9 +162,10 @@ export default function SharePage() {
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <button className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-sm font-medium">Submit</button>
+            <button type="submit" disabled={submitting} className="px-4 py-2 rounded bg-emerald-600 disabled:bg-neutral-700 hover:bg-emerald-500 text-sm font-medium">{submitting ? 'Submitting…' : 'Submit'}</button>
             <span className="text-xs text-neutral-500">Powered by formsubmit.co</span>
           </div>
+          {errorMsg && <div className="text-sm text-red-400">{errorMsg}</div>}
         </form>
       </div>
     </div>
