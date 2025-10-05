@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -90,6 +91,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <nav className="sticky top-0 z-50 bg-neutral-950/80 backdrop-blur border-b border-neutral-800">
+          <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between text-sm">
+            <Link href="/" className="font-semibold text-neutral-100">Eco-Safe</Link>
+            <div className="flex items-center gap-4 text-neutral-300">
+              <Link href="/result" className="hover:text-neutral-100">Results</Link>
+              <Link href="/share" className="hover:text-neutral-100">Share input</Link>
+              <Link href="/listings" className="hover:text-neutral-100">Verified listings</Link>
+              <a href="https://github.com/RejoiceOwoh/nasaglobe" target="_blank" className="hover:text-neutral-100">GitHub</a>
+            </div>
+          </div>
+        </nav>
         {children}
       </body>
     </html>

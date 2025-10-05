@@ -138,6 +138,10 @@ export default function Home() {
               <input type="checkbox" checked={showWater} onChange={() => setShowWater(v=>!v)} /> Water mask
             </label>
           </div>
+          <div className="mt-2 text-[11px] text-neutral-400 space-y-1">
+            <div><b>LST</b>: Land surface temperature (daytime heat). <b>AOD</b>: Aerosol pollution layer. <b>Night lights</b>: Urbanization proxy. <b>Water</b>: Water bodies/mask.</div>
+            <div>Tip: Toggle layers to see relationships (e.g., high LST + low NDVI = heat islands).</div>
+          </div>
           <div className="h-[420px] mt-2 rounded overflow-hidden border border-neutral-800">
             <MapClient
               picked={picked}

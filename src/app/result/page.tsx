@@ -46,6 +46,17 @@ function Metric({ label, value, hint }: { label: string; value: string | number 
   );
 }
 
+function MarkdownLite({ text }: { text: string }) {
+  // Very small markdown subset for **bold** and line breaks
+  const html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br/>');
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 function ResultInner() {
   const params = useSearchParams();
   const lat = useMemo(() => Number(params.get('lat')), [params]);
@@ -175,21 +186,51 @@ function ResultInner() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              <Metric label="Current Heat Index" value={metrics.currentHeatIndexF !== undefined ? `${Math.round(metrics.currentHeatIndexF)} °F` : (metrics.heatIndexF !== undefined ? `${Math.round(metrics.heatIndexF)} °F` : undefined)} hint={`Realtime 'feels like' heat using temperature and humidity${metrics.currentHeatIndexSource ? ` (source: ${metrics.currentHeatIndexSource})` : ''}.`} />
-              <Metric label="Max Heat Index (24h)" value={metrics.maxHeatIndex24hF !== undefined ? `${Math.round(metrics.maxHeatIndex24hF)} °F` : undefined} hint="Highest heat index observed over the last 24 hours (UTC)." />
-              <Metric label="Recent hot days (7d)" value={metrics.recentHotDays} hint="Number of days with dangerous heat index in the last week." />
-              <Metric label="Population density" value={metrics.populationDensity !== undefined ? `${Math.round(metrics.populationDensity)} ppl/km²` : undefined} hint="People per square kilometer (SEDAC GPW)." />
-              <Metric label="Nearby hazards (100 km)" value={metrics.nearbyHazards?.count ?? 0} hint="Open events from NASA EONET within 100 km." />
-              <Metric label="Air quality proxy" value={metrics.airQualityProxy !== undefined ? metrics.airQualityProxy : undefined} hint="Derived from nearby smoke/dust/volcanic signals." />
-              <Metric label="Air quality (PM2.5/AQI)" value={metrics.airNow?.aqiUS !== undefined ? `AQI ${metrics.airNow.aqiUS}${metrics.airNow.pm25 !== undefined ? ` • ${metrics.airNow.pm25} µg/m³` : ''}` : undefined} hint="Nearest OpenAQ observation (latest)." />
-              <Metric label="Now: Temp" value={metrics.now?.temperature_2m !== undefined ? `${metrics.now.temperature_2m.toFixed(1)} °C` : undefined} />
-              <Metric label="Now: Humidity" value={metrics.now?.relative_humidity_2m !== undefined ? `${metrics.now.relative_humidity_2m}%` : undefined} />
-              <Metric label="Now: Apparent" value={metrics.now?.apparent_temperature !== undefined ? `${metrics.now.apparent_temperature.toFixed(1)} °C` : undefined} />
-              <Metric label="Now: Wind" value={metrics.now?.wind_speed_10m !== undefined ? `${metrics.now.wind_speed_10m} m/s` : undefined} />
-              <Metric label="Now: Gusts" value={metrics.now?.wind_gusts_10m !== undefined ? `${metrics.now.wind_gusts_10m} m/s` : undefined} />
-              <Metric label="Now: Precip" value={metrics.now?.precipitation !== undefined ? `${metrics.now.precipitation} mm` : undefined} />
-              <Metric label="Now: Cloud" value={metrics.now?.cloud_cover !== undefined ? `${metrics.now.cloud_cover}%` : undefined} />
-              <Metric label="Now: UV Index" value={metrics.now?.uv_index !== undefined ? `${metrics.now.uv_index}` : undefined} />
+              {(metrics.currentHeatIndexF !== undefined || metrics.heatIndexF !== undefined) && (
+                <Metric label="Current Heat Index" value={metrics.currentHeatIndexF !== undefined ? `${Math.round(metrics.currentHeatIndexF)} °F` : (metrics.heatIndexF !== undefined ? `${Math.round(metrics.heatIndexF)} °F` : undefined)} hint={`Realtime 'feels like' heat using temperature and humidity${metrics.currentHeatIndexSource ? ` (source: ${metrics.currentHeatIndexSource})` : ''}.`} />
+              )}
+              {metrics.maxHeatIndex24hF !== undefined && (
+                <Metric label="Max Heat Index (24h)" value={`${Math.round(metrics.maxHeatIndex24hF)} °F`} hint="Highest heat index observed over the last 24 hours (UTC)." />
+              )}
+              {typeof metrics.recentHotDays === 'number' && (
+                <Metric label="Recent hot days (7d)" value={metrics.recentHotDays} hint="Number of days with dangerous heat index in the last week." />
+              )}
+              {metrics.populationDensity !== undefined && (
+                <Metric label="Population density" value={`${Math.round(metrics.populationDensity)} ppl/km²`} hint="People per square kilometer (SEDAC GPW)." />
+              )}
+              {typeof metrics.nearbyHazards?.count === 'number' && (
+                <Metric label="Nearby hazards (100 km)" value={metrics.nearbyHazards?.count} hint="Open events from NASA EONET within 100 km." />
+              )}
+              {metrics.airQualityProxy !== undefined && (
+                <Metric label="Air quality proxy" value={metrics.airQualityProxy} hint="Derived from nearby smoke/dust/volcanic signals." />
+              )}
+              {metrics.airNow?.aqiUS !== undefined && (
+                <Metric label="Air quality (PM2.5/AQI)" value={`AQI ${metrics.airNow.aqiUS}${metrics.airNow.pm25 !== undefined ? ` • ${metrics.airNow.pm25} µg/m³` : ''}`} hint="Nearest OpenAQ observation (latest)." />
+              )}
+              {metrics.now?.temperature_2m !== undefined && (
+                <Metric label="Now: Temp" value={`${metrics.now.temperature_2m.toFixed(1)} °C`} />
+              )}
+              {metrics.now?.relative_humidity_2m !== undefined && (
+                <Metric label="Now: Humidity" value={`${metrics.now.relative_humidity_2m}%`} />
+              )}
+              {metrics.now?.apparent_temperature !== undefined && (
+                <Metric label="Now: Apparent" value={`${metrics.now.apparent_temperature.toFixed(1)} °C`} />
+              )}
+              {metrics.now?.wind_speed_10m !== undefined && (
+                <Metric label="Now: Wind" value={`${metrics.now.wind_speed_10m} m/s`} />
+              )}
+              {metrics.now?.wind_gusts_10m !== undefined && (
+                <Metric label="Now: Gusts" value={`${metrics.now.wind_gusts_10m} m/s`} />
+              )}
+              {metrics.now?.precipitation !== undefined && (
+                <Metric label="Now: Precip" value={`${metrics.now.precipitation} mm`} />
+              )}
+              {metrics.now?.cloud_cover !== undefined && (
+                <Metric label="Now: Cloud" value={`${metrics.now.cloud_cover}%`} />
+              )}
+              {metrics.now?.uv_index !== undefined && (
+                <Metric label="Now: UV Index" value={`${metrics.now.uv_index}`} />
+              )}
             </div>
           )}
           {metrics.nearbyHazards?.categories && (
@@ -214,7 +255,9 @@ function ResultInner() {
             </div>
           ) : (
             <ul className="list-disc ml-5 mt-1 space-y-1 text-sm">
-              {advice.length ? advice.map((a, i) => <li key={i}>{a}</li>) : <li>No specific advisories for this location right now.</li>}
+              {advice.length ? advice.map((a, i) => (
+                <li key={i}><MarkdownLite text={a} /></li>
+              )) : <li>No specific advisories for this location right now.</li>}
             </ul>
           )}
           <div className="mt-3">
@@ -240,8 +283,8 @@ function ResultInner() {
             </button>
             {explain?.error && <div className="text-xs text-red-400 mt-2">{explain.error}</div>}
             {explain?.text && (
-              <div className="mt-2 text-sm text-neutral-200 whitespace-pre-wrap border border-neutral-800 rounded p-3 bg-neutral-900">
-                {explain.text}
+              <div className="mt-2 text-sm text-neutral-200 border border-neutral-800 rounded p-3 bg-neutral-900">
+                <MarkdownLite text={explain.text} />
               </div>
             )}
           </div>
@@ -268,60 +311,97 @@ function ResultInner() {
         )}
 
         {valid && enableChat && (
-          <Card>
-            <div className="text-neutral-300 font-medium mb-3">Ask AI about this place</div>
-            <div className="flex gap-2">
-              <input
-                className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm"
-                placeholder="e.g., Is it safe to run outside in the afternoon?"
-                value={qa?.q ?? ''}
-                onChange={(e) => setQa({ q: e.target.value, a: qa?.a ?? '' })}
-              />
-              <button
-                disabled={!(qa?.q) || loading}
-                onClick={async () => {
-                  if (!qa?.q) return;
-                  setQa({ q: qa.q, a: '', loading: true });
-                  try {
-                    const res = await fetch('/api/chat', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ question: qa.q, lat, lon, context: metrics, history: chat })
-                    });
-                    const j = await res.json();
-                    if (!res.ok) {
-                      const detail = typeof j?.detail === 'string' ? j.detail : '';
-                      const errMsg = [j?.error || 'AI error', detail].filter(Boolean).join(': ');
-                      setQa({ q: qa.q, a: '', error: errMsg.slice(0, 800), loading: false });
-                    } else {
-                      const answer = j?.answer ?? 'No answer';
-                      setQa({ q: qa.q, a: answer, loading: false });
-                      setChat((h) => [...h, { role: 'user' as const, content: qa.q! }, { role: 'assistant' as const, content: answer }].slice(-12));
-                    }
-                  } catch {
-                    setQa({ q: qa.q, a: '', error: 'Error contacting AI service.', loading: false });
-                  }
-                }}
-                className="px-3 py-2 rounded bg-emerald-600 disabled:bg-neutral-700 hover:bg-emerald-500 text-sm font-medium"
-              >Ask</button>
-            </div>
-            {chat.length > 0 && (
-              <div className="mt-3 space-y-2 text-sm">
+          <div className="fixed bottom-4 right-4 z-50">
+            <div className="rounded-lg border border-neutral-800 bg-neutral-900/90 backdrop-blur shadow-lg w-[320px] overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
+                <div className="text-xs text-neutral-300">Ask AI about this place</div>
+                <button
+                  onClick={() => setQa(qa?.q || qa?.a || qa?.error ? qa : { q: '', a: '' })}
+                  className="text-xs text-neutral-400 hover:text-neutral-200"
+                  title="Clear"
+                >Clear</button>
+              </div>
+              <div className="max-h-72 overflow-y-auto p-3 space-y-2 text-sm">
                 {chat.map((m, i) => (
                   <div key={i} className={`p-2 rounded ${m.role === 'user' ? 'bg-neutral-800' : 'bg-neutral-900 border border-neutral-800'}`}>
                     <div className="text-xs text-neutral-400 mb-1">{m.role === 'user' ? 'You' : 'AI'}</div>
-                    <div className="whitespace-pre-wrap">{m.content}</div>
+                    <MarkdownLite text={m.content} />
                   </div>
                 ))}
+                {qa?.a && (
+                  <div className="p-2 rounded bg-neutral-900 border border-neutral-800">
+                    <div className="text-xs text-neutral-400 mb-1">AI</div>
+                    <MarkdownLite text={qa.a} />
+                  </div>
+                )}
+                {qa?.error && <div className="text-xs text-red-400">{qa.error}</div>}
               </div>
-            )}
-            {qa?.error && (
-              <div className="mt-3 text-sm text-red-400">{qa.error}</div>
-            )}
-            {qa?.a && (
-              <div className="mt-3 text-sm text-neutral-200 whitespace-pre-wrap">{qa.a}</div>
-            )}
-          </Card>
+              <div className="flex gap-2 p-2 border-t border-neutral-800">
+                <input
+                  className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm"
+                  placeholder="Ask a question…"
+                  value={qa?.q ?? ''}
+                  onChange={(e) => setQa({ q: e.target.value, a: qa?.a ?? '' })}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && qa?.q && !qa?.loading) {
+                      e.preventDefault();
+                      const q = qa.q;
+                      setChat((h) => [...h, { role: 'user' as const, content: q }].slice(-12));
+                      setQa({ q: '', a: '', loading: true });
+                      try {
+                        const res = await fetch('/api/chat', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ question: q, lat, lon, context: metrics, history: chat })
+                        });
+                        const j = await res.json();
+                        if (!res.ok) {
+                          const detail = typeof j?.detail === 'string' ? j.detail : '';
+                          const errMsg = [j?.error || 'AI error', detail].filter(Boolean).join(': ');
+                          setQa({ q: '', a: '', error: errMsg.slice(0, 800), loading: false });
+                        } else {
+                          const answer = j?.answer ?? 'No answer';
+                          setChat((h) => [...h, { role: 'assistant' as const, content: answer }].slice(-12));
+                          setQa({ q: '', a: '', loading: false });
+                        }
+                      } catch {
+                        setQa({ q: '', a: '', error: 'Error contacting AI service.', loading: false });
+                      }
+                    }
+                  }}
+                />
+                <button
+                  disabled={!(qa?.q) || qa?.loading}
+                  onClick={async () => {
+                    if (!qa?.q) return;
+                    const q = qa.q;
+                    setChat((h) => [...h, { role: 'user' as const, content: q }].slice(-12));
+                    setQa({ q: '', a: '', loading: true });
+                    try {
+                      const res = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: q, lat, lon, context: metrics, history: chat })
+                      });
+                      const j = await res.json();
+                      if (!res.ok) {
+                        const detail = typeof j?.detail === 'string' ? j.detail : '';
+                        const errMsg = [j?.error || 'AI error', detail].filter(Boolean).join(': ');
+                        setQa({ q: '', a: '', error: errMsg.slice(0, 800), loading: false });
+                      } else {
+                        const answer = j?.answer ?? 'No answer';
+                        setChat((h) => [...h, { role: 'assistant' as const, content: answer }].slice(-12));
+                        setQa({ q: '', a: '', loading: false });
+                      }
+                    } catch {
+                      setQa({ q: '', a: '', error: 'Error contacting AI service.', loading: false });
+                    }
+                  }}
+                  className="px-3 py-2 rounded bg-emerald-600 disabled:bg-neutral-700 hover:bg-emerald-500 text-sm font-medium"
+                >{qa?.loading ? '…' : 'Ask'}</button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
