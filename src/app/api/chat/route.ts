@@ -35,27 +35,53 @@ export async function POST(req: NextRequest) {
 
     const primaryModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
     let res: Response = await call(primaryModel);
+    let provider: 'openai' | 'groq' = 'openai';
     if (!res.ok) {
       const t1 = await res.text();
-      // Try first fallback
+      // Try OpenAI fallback(s)
       const fallbackModel1 = primaryModel !== 'gpt-3.5-turbo' ? 'gpt-3.5-turbo' : 'gpt-4o-mini';
       res = await call(fallbackModel1);
       if (!res.ok) {
         const t2 = await res.text();
-        // Try a second lightweight fallback as last resort
         const fallbackModel2 = 'gpt-4o-mini';
         res = await call(fallbackModel2);
         if (!res.ok) {
           const t3 = await res.text();
-          const detail = (t3 || t2 || t1) ? (t3 || t2 || t1).slice(0, 1200) : 'Unknown error';
-          return NextResponse.json({ error: 'OpenAI error', detail }, { status: 500 });
+          // Try Groq if available
+          const gk = process.env.GROQ_API_KEY;
+          if (gk) {
+            const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+            const gres = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gk}` },
+              body: JSON.stringify({
+                model: groqModel,
+                messages: [
+                  { role: 'system', content: sys },
+                  { role: 'user', content: user }
+                ],
+                temperature: 0.3,
+                max_tokens: 300
+              })
+            });
+            if (!gres.ok) {
+              const tg = await gres.text();
+              const detail = (tg || t3 || t2 || t1) ? (tg || t3 || t2 || t1).slice(0, 1200) : 'Unknown error';
+              return NextResponse.json({ error: 'OpenAI/Groq error', detail }, { status: 500 });
+            }
+            provider = 'groq';
+            res = gres;
+          } else {
+            const detail = (t3 || t2 || t1) ? (t3 || t2 || t1).slice(0, 1200) : 'Unknown error';
+            return NextResponse.json({ error: 'OpenAI error', detail }, { status: 500 });
+          }
         }
       }
     }
     type ChatResponse = { choices?: Array<{ message?: { content?: string } }> };
     const j: ChatResponse = await res.json();
     const content = j?.choices?.[0]?.message?.content || 'No answer generated.';
-    return NextResponse.json({ answer: content });
+    return NextResponse.json({ answer: content, provider });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unexpected error';
     return NextResponse.json({ error: 'Unexpected error', detail: msg }, { status: 500 });

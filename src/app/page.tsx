@@ -19,6 +19,10 @@ export default function Home() {
   const router = useRouter();
   const [showTrueColor, setShowTrueColor] = useState(true);
   const [showNdvi, setShowNdvi] = useState(true);
+  const [showLst, setShowLst] = useState(false);
+  const [showAod, setShowAod] = useState(false);
+  const [showLights, setShowLights] = useState(false);
+  const [showWater, setShowWater] = useState(false);
   const [base, setBase] = useState<'osm' | 'satellite' | 'humanitarian' | 'streets'>('osm');
 
   const canScore = useMemo(() => typeof lat === 'number' && typeof lon === 'number' && !Number.isNaN(lat) && !Number.isNaN(lon), [lat, lon]);
@@ -121,6 +125,18 @@ export default function Home() {
             <label className="inline-flex items-center gap-2">
               <input type="checkbox" checked={showNdvi} onChange={() => setShowNdvi(v=>!v)} /> NDVI (greenery)
             </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={showLst} onChange={() => setShowLst(v=>!v)} /> LST (surface heat)
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={showAod} onChange={() => setShowAod(v=>!v)} /> AOD (aerosol)
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={showLights} onChange={() => setShowLights(v=>!v)} /> Night lights
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={showWater} onChange={() => setShowWater(v=>!v)} /> Water mask
+            </label>
           </div>
           <div className="h-[420px] mt-2 rounded overflow-hidden border border-neutral-800">
             <MapClient
@@ -130,7 +146,7 @@ export default function Home() {
                 setLon(Number(pt.lon.toFixed(5)));
                 setPicked(pt);
               }}
-              overlays={{ trueColor: showTrueColor, ndvi: showNdvi }}
+              overlays={{ trueColor: showTrueColor, ndvi: showNdvi, lst: showLst, aod: showAod, lights: showLights, water: showWater }}
               base={base}
             />
           </div>

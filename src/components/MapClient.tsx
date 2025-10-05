@@ -21,7 +21,7 @@ export default function MapClient({
 }: {
   picked: { lat: number; lon: number } | null;
   onPick: (pt: { lat: number; lon: number }) => void;
-  overlays?: { trueColor?: boolean; ndvi?: boolean };
+  overlays?: { trueColor?: boolean; ndvi?: boolean; lst?: boolean; aod?: boolean; lights?: boolean; water?: boolean };
   base?: 'osm' | 'streets' | 'satellite' | 'humanitarian';
 }) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -33,6 +33,22 @@ export default function MapClient({
   const ndvi = useMemo(
     () =>
       `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Combined_NDVI_16Day/default/${today}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`,
+    [today]
+  );
+  const lst = useMemo(
+    () => `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_LST_Day_1km/default/${today}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+    [today]
+  );
+  const aod = useMemo(
+    () => `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_Aerosol/default/${today}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+    [today]
+  );
+  const lights = useMemo(
+    () => `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_CityLights_2012/default/${today}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+    [today]
+  );
+  const water = useMemo(
+    () => `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/${today}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
     [today]
   );
 
@@ -79,6 +95,18 @@ export default function MapClient({
       )}
       {overlays?.ndvi !== false && (
         <TileLayer attribution="NDVI © NASA GIBS" url={ndvi} opacity={0.4} />
+      )}
+      {overlays?.lst && (
+        <TileLayer attribution="LST © NASA GIBS" url={lst} opacity={0.5} />
+      )}
+      {overlays?.aod && (
+        <TileLayer attribution="Aerosol © NASA GIBS" url={aod} opacity={0.5} />
+      )}
+      {overlays?.lights && (
+        <TileLayer attribution="VIIRS Lights © NASA GIBS" url={lights} opacity={0.6} />
+      )}
+      {overlays?.water && (
+        <TileLayer attribution="Blue Marble © NASA GIBS" url={water} opacity={0.5} />
       )}
       {picked && (
         <Marker position={([picked.lat, picked.lon] as unknown) as LatLngExpression} icon={icon}>

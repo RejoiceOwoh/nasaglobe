@@ -16,6 +16,7 @@ type ScoreResult = {
     nearbyHazards?: { count: number; nearestKm?: number; categories: Record<string, number> };
     airQualityProxy?: number;
     airNow?: { pm25?: number; aqiUS?: number; observedAt?: string };
+    settlement?: { name?: string; class?: string; type?: string };
     healthBadge?: string;
     floodBadge?: string;
   };
@@ -57,6 +58,9 @@ function ResultInner() {
     let alive = true;
     async function run() {
       if (!valid) { setData(null); return; }
+      // Clear previous data to avoid stale flash and show skeleton immediately
+      setLoading(true);
+      setData(null);
       try {
         const res = await fetch(`/api/score?lat=${lat}&lon=${lon}`, { cache: 'no-store' });
         const json = await res.json();
@@ -76,6 +80,7 @@ function ResultInner() {
   const advice = Array.isArray(data?.advice) ? data!.advice : [];
   const adviceSource = data?.adviceSource;
   const [qa, setQa] = useState<{ q: string; a: string; loading?: boolean; error?: string } | null>(null);
+  const enableChat = process.env.NEXT_PUBLIC_ENABLE_CHAT !== 'false';
 
   function scoreColor(s: number) {
     if (s >= 80) return "text-emerald-400";
@@ -88,7 +93,7 @@ function ResultInner() {
     <div className="min-h-screen p-6 sm:p-10 bg-neutral-950 text-neutral-100">
       <header className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold">Location Score</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold">{data?.metrics?.settlement?.name || 'Location Score'}</h1>
           {valid && (
             <div className="text-xs text-neutral-400">{lat.toFixed(5)}, {lon.toFixed(5)}</div>
           )}
@@ -223,7 +228,7 @@ function ResultInner() {
           </Card>
         )}
 
-        {valid && (
+        {valid && enableChat && (
           <Card>
             <div className="text-neutral-300 font-medium mb-3">Ask AI about this place</div>
             <div className="flex gap-2">
